@@ -66,12 +66,30 @@ auto ExtendibleHashTable<K, V>::GetNumBucketsInternal() const -> int {
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Find(const K &key, V &value) -> bool {
-  UNREACHABLE("not implemented");
+  size_t index = IndexOf(key);
+  std::list<std::pair<K, V>> list_ = dir_[index]->GetItems();
+  for (auto ele = list_.begin(); ele != list_.end(); ele++) {
+    std::pair<K, V> entry = *ele;
+    if (entry.first == key && entry.second == value) {
+      return true;
+    }
+  }
+  return false;
 }
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Remove(const K &key) -> bool {
-  UNREACHABLE("not implemented");
+  size_t index = IndexOf(key);
+  std::list<std::pair<K, V>> list_ = dir_[index]->GetItems();
+  for (auto ele = list_.begin(); ele != list_.end();) {
+    std::pair<K, V> entry = *ele;
+    if (entry.first == key) {
+      list_.erase(ele);
+      return true;
+    }
+    ele++;
+  }
+  return false;
 }
 
 template <typename K, typename V>
