@@ -108,12 +108,24 @@ auto ExtendibleHashTable<K, V>::Bucket::Remove(const K &key) -> bool {
     }
     ele++;
   }
-  return false;;
+  return false;
+  ;
 }
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Bucket::Insert(const K &key, const V &value) -> bool {
-  UNREACHABLE("not implemented");
+  // if the key already exists, overwrite its value with new value
+  for (auto ele = list_.begin(); ele != list_.end(); ele++) {
+    std::pair<K, V> entry = *ele;
+    if (entry.first == key) {
+      entry.second = value;
+      return true;
+    }
+  }
+
+  // Here assume the local depth of the bucket is less than global depth.
+  list_.emplace_back(std::make_pair(key, value));
+  return true;
 }
 
 template class ExtendibleHashTable<page_id_t, Page *>;
