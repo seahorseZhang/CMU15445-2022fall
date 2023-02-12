@@ -81,7 +81,6 @@ auto ExtendibleHashTable<K, V>::Remove(const K &key) -> bool {
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucket) -> void {
-  std::cout << "Redistribute bucket." << std::endl;
   int newDepth = bucket->GetDepth() + 1;
   size_t baseMask = (1 << bucket->GetDepth()) - 1;
   size_t splitMask = (1 << newDepth) - 1;
@@ -111,11 +110,9 @@ auto ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucke
 template <typename K, typename V>
 void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   size_t index = IndexOf(key);
-  std::cout << "Index of key is: " << index << std::endl;
   std::shared_ptr<Bucket> bucket = dir_[index];
   bool res = bucket->Insert(key, value);
   if (res) {
-    std::cout << "Bucket is not full, insert success." << std::endl;
     return;
   }
 
@@ -126,7 +123,6 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   }
 
   // Bucket is full, depth of bucket equals global depth, extend the dir and split the bucket.
-  std::cout << "Bucket is full, extend the dir and split bucket." << std::endl;
   int dirMask = (1 << global_depth_) - 1;
   global_depth_++;
   std::vector<std::shared_ptr<Bucket>> newDir(1 << global_depth_);

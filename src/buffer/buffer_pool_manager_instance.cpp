@@ -38,7 +38,6 @@ BufferPoolManagerInstance::~BufferPoolManagerInstance() {
 }
 
 auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
-  page_id_t new_page_id = AllocatePage();
   frame_id_t frame_id;
   if (free_list_.size() > 0) {
     frame_id = free_list_.front();
@@ -53,12 +52,13 @@ auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
     }
     page_table_->Remove(pages_[frame_id].page_id_);
   }
+  page_id_t new_page_id = AllocatePage();
   *page_id = new_page_id;
   pages_[frame_id].ResetMemory();
   pages_[frame_id].page_id_ = new_page_id;
   pages_[frame_id].pin_count_ = 1;
-  replacer_->SetEvictable(frame_id, false);
   replacer_->RecordAccess(frame_id);
+  replacer_->SetEvictable(frame_id, false);
   page_table_->Insert(new_page_id, frame_id);
   return &pages_[frame_id];
 }
@@ -120,9 +120,32 @@ auto BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) -> bool {
   return true;
 }
 
-void BufferPoolManagerInstance::FlushAllPgsImp() {}
+void BufferPoolManagerInstance::FlushAllPgsImp() {
+  for (size_t index = 0; index < pool_size_; index++) {
+    page_id_t page_id = pages_[index].page_id_;
+    if (page_id != INVALID_PAGE_ID) {
+      FlushPgImp(page_id);
+    }
+  }
+}
 
-auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool { return false; }
+auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
+  frame_id_t frame_id;
+  bool isFind = page_table_->Find(page_id, frame_id);
+  if (!isFind) {
+    return false;
+  }
+  Page *page = &pages_[frame_id];
+  if (page->GetPinCount() > 0) {
+    return false;
+  }
+  page_table_->Remove(page_id);
+  replacer_->Remove(frame_id);
+  free_list_.emplace_back(frame_id);
+  page->ResetMemory();
+  DeallocatePage(page_id);
+  return false;
+}
 
 auto BufferPoolManagerInstance::AllocatePage() -> page_id_t { return next_page_id_++; }
 
