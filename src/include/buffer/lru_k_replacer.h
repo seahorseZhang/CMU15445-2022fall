@@ -14,6 +14,7 @@
 
 #include <limits>
 #include <list>
+#include <memory>
 #include <mutex>  // NOLINT
 #include <unordered_map>
 #include <vector>
@@ -132,6 +133,30 @@ class LRUKReplacer {
    */
   auto Size() -> size_t;
 
+  class FrameInfo {
+   public:
+    FrameInfo(frame_id_t frame_id, size_t timestamp);
+
+    inline auto IsEvictable() -> bool { return evictable; };
+
+    inline auto SetEvictable(const bool is_evictable) -> void { evictable = is_evictable; };
+
+    inline auto IncreaseTimes() -> void {
+      times += 1;
+      return;
+    };
+
+    inline auto GetId() const -> frame_id_t { return frame_id; };
+
+    inline auto GetTimes() const -> size_t { return times; };
+
+   private:
+    frame_id_t frame_id;
+    size_t timestamp;
+    size_t times;
+    bool evictable;
+  };
+
  private:
   // TODO(student): implement me! You can replace these member variables as you like.
   // Remove maybe_unused if you start using them.
@@ -139,6 +164,8 @@ class LRUKReplacer {
   [[maybe_unused]] size_t curr_size_{0};
   [[maybe_unused]] size_t replacer_size_;
   [[maybe_unused]] size_t k_;
+  std::list<std::unique_ptr<FrameInfo>> cache_pool;
+  std::list<std::unique_ptr<FrameInfo>> temp_pool;
   std::mutex latch_;
 };
 
