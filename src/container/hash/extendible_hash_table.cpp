@@ -126,7 +126,8 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   int dir_mask = (1 << global_depth_) - 1;
   global_depth_++;
   std::vector<std::shared_ptr<Bucket>> new_dir(1 << global_depth_);
-  for (size_t i = 0; i < static_cast<size_t>(1 << global_depth_); i++) {
+  size_t dir_size = 1 << global_depth_;
+  for (size_t i = 0; i < dir_size; i++) {
     size_t old_index = i & dir_mask;
     new_dir[i] = dir_[old_index];
   }
