@@ -39,7 +39,7 @@ BufferPoolManagerInstance::~BufferPoolManagerInstance() {
 
 auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
   frame_id_t frame_id;
-  if (free_list_.size() > 0) {
+  if (!free_list_.empty()) {
     frame_id = free_list_.front();
     free_list_.erase(free_list_.begin());
   } else {
@@ -69,7 +69,7 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
   if (is_find) {
     return &pages_[frame_id];
   }
-  if (free_list_.size() > 0) {
+  if (!free_list_.empty()) {
     frame_id = free_list_.front();
     free_list_.erase(free_list_.begin());
   } else {
@@ -111,8 +111,8 @@ auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> 
 
 auto BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) -> bool {
   frame_id_t frame_id;
-  bool isFind = page_table_->Find(page_id, frame_id);
-  if (!isFind) {
+  bool is_find = page_table_->Find(page_id, frame_id);
+  if (!is_find) {
     return false;
   }
   disk_manager_->WritePage(page_id, pages_[frame_id].data_);
@@ -131,8 +131,8 @@ void BufferPoolManagerInstance::FlushAllPgsImp() {
 
 auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
   frame_id_t frame_id;
-  bool isFind = page_table_->Find(page_id, frame_id);
-  if (!isFind) {
+  bool is_find = page_table_->Find(page_id, frame_id);
+  if (!is_find) {
     return false;
   }
   Page *page = &pages_[frame_id];

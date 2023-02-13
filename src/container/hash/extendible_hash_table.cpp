@@ -81,28 +81,28 @@ auto ExtendibleHashTable<K, V>::Remove(const K &key) -> bool {
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucket) -> void {
-  int newDepth = bucket->GetDepth() + 1;
-  size_t baseMask = (1 << bucket->GetDepth()) - 1;
-  size_t splitMask = (1 << newDepth) - 1;
-  auto firstBucket = std::make_shared<Bucket>(bucket_size_, newDepth);
-  auto secondBucket = std::make_shared<Bucket>(bucket_size_, newDepth);
+  int new_depth = bucket->GetDepth() + 1;
+  size_t base_mask = (1 << bucket->GetDepth()) - 1;
+  size_t split_mask = (1 << new_depth) - 1;
+  auto first_bucket = std::make_shared<Bucket>(bucket_size_, new_depth);
+  auto second_bucket = std::make_shared<Bucket>(bucket_size_, new_depth);
   std::list<std::pair<K, V>> items = bucket->GetItems();
-  size_t lowIndex = IndexOf(items.begin()->first) & baseMask;
+  size_t low_index = IndexOf(items.begin()->first) & base_mask;
   for (auto ele = items.begin(); ele != items.end(); ele++) {
-    size_t splitIndex = IndexOf(ele->first);
-    if ((splitIndex & splitMask) == lowIndex) {
-      firstBucket->GetItems().emplace_back(*ele);
+    size_t split_index = IndexOf(ele->first);
+    if ((split_index & split_mask) == low_index) {
+      first_bucket->GetItems().emplace_back(*ele);
       continue;
     }
-    secondBucket->GetItems().emplace_back(*ele);
+    second_bucket->GetItems().emplace_back(*ele);
   }
   for (size_t i = 0; i < dir_.size(); i++) {
-    if ((i & baseMask) == lowIndex) {
-      if ((i & splitMask) == lowIndex) {
-        dir_[i] = firstBucket;
+    if ((i & base_mask) == low_index) {
+      if ((i & split_mask) == low_index) {
+        dir_[i] = first_bucket;
         continue;
       }
-      dir_[i] = secondBucket;
+      dir_[i] = second_bucket;
     }
   }
 }
@@ -123,14 +123,14 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   }
 
   // Bucket is full, depth of bucket equals global depth, extend the dir and split the bucket.
-  int dirMask = (1 << global_depth_) - 1;
+  int dir_mask = (1 << global_depth_) - 1;
   global_depth_++;
-  std::vector<std::shared_ptr<Bucket>> newDir(1 << global_depth_);
-  for (size_t i = 0; i < (size_t)(1 << global_depth_); i++) {
-    size_t oldIndex = i & dirMask;
-    newDir[i] = dir_[oldIndex];
+  std::vector<std::shared_ptr<Bucket>> new_dir(1 << global_depth_);
+  for (size_t i = 0; i < static_cast<size_t>(1 << global_depth_); i++) {
+    size_t old_index = i & dir_mask;
+    new_dir[i] = dir_[old_index];
   }
-  dir_ = newDir;
+  dir_ = new_dir;
   RedistributeBucket(bucket);
   return Insert(key, value);
 }

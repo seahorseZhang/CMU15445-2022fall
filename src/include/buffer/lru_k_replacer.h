@@ -135,26 +135,22 @@ class LRUKReplacer {
 
   class FrameInfo {
    public:
-    FrameInfo(frame_id_t frame_id, size_t timestamp);
+    explicit FrameInfo(frame_id_t frame_id);
 
-    inline auto IsEvictable() -> bool { return evictable; };
+    inline auto IsEvictable() -> bool { return evictable_; };
 
-    inline auto SetEvictable(const bool is_evictable) -> void { evictable = is_evictable; };
+    inline auto SetEvictable(const bool is_evictable) -> void { evictable_ = is_evictable; };
 
-    inline auto IncreaseTimes() -> void {
-      times += 1;
-      return;
-    };
+    inline auto IncreaseTimes() -> void { times_ += 1; };
 
-    inline auto GetId() const -> frame_id_t { return frame_id; };
+    inline auto GetId() const -> frame_id_t { return frame_id_; };
 
-    inline auto GetTimes() const -> size_t { return times; };
+    inline auto GetTimes() const -> size_t { return times_; };
 
    private:
-    frame_id_t frame_id;
-    size_t timestamp;
-    size_t times;
-    bool evictable;
+    frame_id_t frame_id_;
+    size_t times_;
+    bool evictable_;
   };
 
  private:
@@ -164,8 +160,8 @@ class LRUKReplacer {
   [[maybe_unused]] size_t curr_size_{0};
   [[maybe_unused]] size_t replacer_size_;
   [[maybe_unused]] size_t k_;
-  std::list<std::unique_ptr<FrameInfo>> cache_pool;
-  std::list<std::unique_ptr<FrameInfo>> temp_pool;
+  std::list<std::unique_ptr<FrameInfo>> cache_pool_;
+  std::list<std::unique_ptr<FrameInfo>> temp_pool_;
   std::mutex latch_;
 };
 

@@ -17,18 +17,18 @@ namespace bustub {
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_frames), k_(k) {}
 
 auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
-  for (auto iter = temp_pool.begin(); iter != temp_pool.end();) {
+  for (auto iter = temp_pool_.begin(); iter != temp_pool_.end();) {
     if ((*iter)->IsEvictable()) {
       *frame_id = (*iter)->GetId();
-      iter = temp_pool.erase(iter);
+      iter = temp_pool_.erase(iter);
       return true;
     }
     iter++;
   }
-  for (auto iter = cache_pool.begin(); iter != cache_pool.end();) {
+  for (auto iter = cache_pool_.begin(); iter != cache_pool_.end();) {
     if ((*iter)->IsEvictable()) {
       *frame_id = (*iter)->GetId();
-      iter = cache_pool.erase(iter);
+      iter = cache_pool_.erase(iter);
       return true;
     }
     iter++;
@@ -37,40 +37,39 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
 }
 
 void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
-  current_timestamp_++;
-  for (auto iter = cache_pool.begin(); iter != cache_pool.end();) {
+  for (auto iter = cache_pool_.begin(); iter != cache_pool_.end();) {
     if ((*iter)->GetId() == frame_id) {
-      cache_pool.emplace_back(std::move(*iter));
-      iter = cache_pool.erase(iter);
+      cache_pool_.emplace_back(std::move(*iter));
+      iter = cache_pool_.erase(iter);
       return;
     }
     iter++;
   }
 
-  for (auto iter = temp_pool.begin(); iter != temp_pool.end();) {
+  for (auto iter = temp_pool_.begin(); iter != temp_pool_.end();) {
     if ((*iter)->GetId() == frame_id) {
       (*iter)->IncreaseTimes();
       if (((*iter)->GetTimes()) >= k_) {
-        cache_pool.emplace_back(std::move(*iter));
-        iter = temp_pool.erase(iter);
+        cache_pool_.emplace_back(std::move(*iter));
+        iter = temp_pool_.erase(iter);
         return;
       }
     }
     iter++;
   }
-  std::unique_ptr<FrameInfo> frame_ptr = std::make_unique<FrameInfo>(frame_id, current_timestamp_);
+  std::unique_ptr<FrameInfo> frame_ptr = std::make_unique<FrameInfo>(frame_id);
   frame_ptr->IncreaseTimes();
-  temp_pool.push_back(std::move(frame_ptr));
+  temp_pool_.push_back(std::move(frame_ptr));
 }
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
-  for (auto &ele : temp_pool) {
+  for (auto &ele : temp_pool_) {
     if (ele->GetId() == frame_id) {
       ele->SetEvictable(set_evictable);
       return;
     }
   }
-  for (auto &ele : cache_pool) {
+  for (auto &ele : cache_pool_) {
     if (ele->GetId() == frame_id) {
       ele->SetEvictable(set_evictable);
       return;
@@ -79,19 +78,19 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
 }
 
 void LRUKReplacer::Remove(frame_id_t frame_id) {
-  for (auto &ele : temp_pool) {
+  for (auto &ele : temp_pool_) {
     if (ele->GetId() == frame_id) {
       if (ele->IsEvictable()) {
-        temp_pool.remove(ele);
+        temp_pool_.remove(ele);
         return;
       }
       throw frame_id;
     }
   }
-  for (auto &ele : cache_pool) {
+  for (auto &ele : cache_pool_) {
     if (ele->GetId() == frame_id) {
       if (ele->IsEvictable()) {
-        cache_pool.remove(ele);
+        cache_pool_.remove(ele);
         return;
       }
       throw frame_id;
@@ -101,12 +100,12 @@ void LRUKReplacer::Remove(frame_id_t frame_id) {
 
 auto LRUKReplacer::Size() -> size_t {
   size_t num = 0;
-  for (auto &ele : cache_pool) {
+  for (auto &ele : cache_pool_) {
     if (ele->IsEvictable()) {
       num++;
     }
   }
-  for (auto &ele : temp_pool) {
+  for (auto &ele : temp_pool_) {
     if (ele->IsEvictable()) {
       num++;
     }
@@ -114,9 +113,9 @@ auto LRUKReplacer::Size() -> size_t {
   return num;
 }
 
-LRUKReplacer::FrameInfo::FrameInfo(frame_id_t frame_id, size_t timestamp) : frame_id(frame_id), timestamp(timestamp) {
-  times = 0;
-  evictable = true;
+LRUKReplacer::FrameInfo::FrameInfo(frame_id_t frame_id) : frame_id_(frame_id) {
+  times_ = 0;
+  evictable_ = true;
 }
 
 }  // namespace bustub
