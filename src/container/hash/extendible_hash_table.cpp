@@ -105,6 +105,7 @@ auto ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucke
       dir_[i] = second_bucket;
     }
   }
+  num_buckets_++;
 }
 
 template <typename K, typename V>
