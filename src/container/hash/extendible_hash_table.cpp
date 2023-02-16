@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "container/hash/extendible_hash_table.h"
+#include "iostream"
 #include "storage/page/page.h"
 
 namespace bustub {
@@ -169,17 +170,16 @@ auto ExtendibleHashTable<K, V>::Bucket::Remove(const K &key) -> bool {
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Bucket::Insert(const K &key, const V &value) -> bool {
-  if (IsFull()) {
-    return false;
-  }
-
   // if the key already exists, overwrite its value with new value
-  for (auto ele = list_.begin(); ele != list_.end(); ele++) {
-    std::pair<K, V> entry = *ele;
-    if (entry.first == key) {
-      entry.second = value;
+  for (auto &[k, v] : list_) {
+    if (k == key) {
+      v = value;
       return true;
     }
+  }
+
+  if (IsFull()) {
+    return false;
   }
 
   // Here the local depth of the bucket is less than global depth.
