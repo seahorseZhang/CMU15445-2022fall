@@ -70,12 +70,14 @@ auto ExtendibleHashTable<K, V>::GetNumBucketsInternal() const -> int {
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Find(const K &key, V &value) -> bool {
+  std::scoped_lock<std::mutex> lock(latch_);
   size_t index = IndexOf(key);
   return dir_[index]->Find(key, value);
 }
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Remove(const K &key) -> bool {
+  std::scoped_lock<std::mutex> lock(latch_);
   size_t index = IndexOf(key);
   return dir_[index]->Remove(key);
 }
@@ -110,7 +112,7 @@ auto ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucke
 }
 
 template <typename K, typename V>
-void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
+void ExtendibleHashTable<K, V>::InsertInternal(const K &key, const V &value) {
   size_t index = IndexOf(key);
   std::shared_ptr<Bucket> bucket = dir_[index];
   bool res = bucket->Insert(key, value);
@@ -119,9 +121,9 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   }
 
   // Bucket is full ,but the depth of bucket less than local depth, split the bucket.
-  if (GetGlobalDepth() > bucket->GetDepth()) {
+  if (GetGlobalDepthInternal() > bucket->GetDepth()) {
     RedistributeBucket(bucket);
-    return Insert(key, value);
+    return InsertInternal(key, value);
   }
 
   // Bucket is full, depth of bucket equals global depth, extend the dir and split the bucket.
@@ -135,7 +137,13 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   }
   dir_ = new_dir;
   RedistributeBucket(bucket);
-  return Insert(key, value);
+  return InsertInternal(key, value);
+}
+
+template <typename K, typename V>
+void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
+  std::scoped_lock<std::mutex> lock(latch_);
+  return InsertInternal(key, value);
 }
 
 //===--------------------------------------------------------------------===//
