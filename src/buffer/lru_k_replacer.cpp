@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "buffer/lru_k_replacer.h"
+#include "iostream"
 
 namespace bustub {
 
@@ -22,6 +23,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
     if ((*iter)->IsEvictable()) {
       *frame_id = (*iter)->GetId();
       iter = temp_pool_.erase(iter);
+      temp_map_.erase(*frame_id);
       latch_.unlock();
       return true;
     }
@@ -31,6 +33,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
     if ((*iter)->IsEvictable()) {
       *frame_id = (*iter)->GetId();
       iter = cache_pool_.erase(iter);
+      cache_map_.erase(*frame_id);
       latch_.unlock();
       return true;
     }
@@ -43,72 +46,70 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
 void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
   BUSTUB_ASSERT(frame_id <= (int)replacer_size_, "Invalid frame id");
   latch_.lock();
-  for (auto iter = cache_pool_.begin(); iter != cache_pool_.end();) {
-    if ((*iter)->GetId() == frame_id) {
-      cache_pool_.emplace_back(std::move(*iter));
-      iter = cache_pool_.erase(iter);
-      latch_.unlock();
-      return;
-    }
-    iter++;
+  if (cache_map_.count(frame_id) != 0U) {
+    auto iter = cache_map_[frame_id];
+    cache_pool_.emplace_back(std::move(*iter));
+    cache_pool_.erase(iter);
+    cache_map_[frame_id] = (--cache_pool_.end());
+    latch_.unlock();
+    return;
   }
 
-  for (auto iter = temp_pool_.begin(); iter != temp_pool_.end();) {
-    if ((*iter)->GetId() == frame_id) {
-      (*iter)->IncreaseTimes();
-      if (((*iter)->GetTimes()) >= k_) {
-        cache_pool_.emplace_back(std::move(*iter));
-        iter = temp_pool_.erase(iter);
-      }
-      latch_.unlock();
-      return;
+  if (temp_map_.count(frame_id) != 0U) {
+    auto iter = temp_map_[frame_id];
+    (*iter)->IncreaseTimes();
+    if ((*iter)->GetTimes() >= k_) {
+      cache_pool_.emplace_back(std::move(*iter));
+      cache_map_[frame_id] = (--cache_pool_.end());
+      temp_pool_.erase(iter);
+      temp_map_.erase(frame_id);
     }
-    iter++;
+    latch_.unlock();
+    return;
   }
+
   std::unique_ptr<FrameInfo> frame_ptr = std::make_unique<FrameInfo>(frame_id);
   frame_ptr->IncreaseTimes();
-  temp_pool_.push_back(std::move(frame_ptr));
+  temp_pool_.emplace_back(std::move(frame_ptr));
+  temp_map_[frame_id] = (--temp_pool_.end());
   latch_.unlock();
 }
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   latch_.lock();
-  for (auto &ele : temp_pool_) {
-    if (ele->GetId() == frame_id) {
-      ele->SetEvictable(set_evictable);
-      latch_.unlock();
-      return;
-    }
+  if (temp_map_.count(frame_id) != 0U) {
+    auto iter = temp_map_[frame_id];
+    (*iter)->SetEvictable(set_evictable);
+    latch_.unlock();
+    return;
   }
-  for (auto &ele : cache_pool_) {
-    if (ele->GetId() == frame_id) {
-      ele->SetEvictable(set_evictable);
-      latch_.unlock();
-      return;
-    }
+
+  if (cache_map_.count(frame_id) != 0U) {
+    auto iter = cache_map_[frame_id];
+    (*iter)->SetEvictable(set_evictable);
+    latch_.unlock();
+    return;
   }
   latch_.unlock();
 }
 
 void LRUKReplacer::Remove(frame_id_t frame_id) {
   latch_.lock();
-  for (auto iter = temp_pool_.begin(); iter != temp_pool_.end();) {
-    if ((*iter)->GetId() == frame_id) {
-      BUSTUB_ASSERT((*iter)->IsEvictable(), "Remove unEvictable frame id.");
-      iter = temp_pool_.erase(iter);
-      latch_.unlock();
-      return;
-    }
-    iter++;
+  if (temp_map_.count(frame_id) != 0U) {
+    auto iter = temp_map_[frame_id];
+    BUSTUB_ASSERT((*iter)->IsEvictable(), "Remove unEvictable frame id.");
+    temp_pool_.erase(iter);
+    temp_map_.erase(frame_id);
+    latch_.unlock();
+    return;
   }
-  for (auto iter = cache_pool_.begin(); iter != cache_pool_.end();) {
-    if ((*iter)->GetId() == frame_id) {
-      BUSTUB_ASSERT((*iter)->IsEvictable(), "Remove unEvictable frame id.");
-      iter = cache_pool_.erase(iter);
-      latch_.unlock();
-      return;
-    }
-    iter++;
+  if (cache_map_.count(frame_id) != 0U) {
+    auto iter = cache_map_[frame_id];
+    BUSTUB_ASSERT((*iter)->IsEvictable(), "Remove unEvictable frame id.");
+    cache_pool_.erase(iter);
+    cache_map_.erase(frame_id);
+    latch_.unlock();
+    return;
   }
   latch_.unlock();
 }
