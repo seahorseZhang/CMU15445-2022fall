@@ -24,6 +24,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
       *frame_id = (*iter)->GetId();
       iter = temp_pool_.erase(iter);
       temp_map_.erase(*frame_id);
+      evitable_size_--;
       latch_.unlock();
       return true;
     }
@@ -34,6 +35,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
       *frame_id = (*iter)->GetId();
       iter = cache_pool_.erase(iter);
       cache_map_.erase(*frame_id);
+      evitable_size_--;
       latch_.unlock();
       return true;
     }
@@ -72,6 +74,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
   frame_ptr->IncreaseTimes();
   temp_pool_.emplace_back(std::move(frame_ptr));
   temp_map_[frame_id] = (--temp_pool_.end());
+  evitable_size_++;
   latch_.unlock();
 }
 
@@ -79,14 +82,20 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   latch_.lock();
   if (temp_map_.count(frame_id) != 0U) {
     auto iter = temp_map_[frame_id];
-    (*iter)->SetEvictable(set_evictable);
+    if ((*iter)->IsEvictable() != set_evictable) {
+      evitable_size_ += (set_evictable ? 1 : -1);
+      (*iter)->SetEvictable(set_evictable);
+    }
     latch_.unlock();
     return;
   }
 
   if (cache_map_.count(frame_id) != 0U) {
     auto iter = cache_map_[frame_id];
-    (*iter)->SetEvictable(set_evictable);
+    if ((*iter)->IsEvictable() != set_evictable) {
+      evitable_size_ += (set_evictable ? 1 : -1);
+      (*iter)->SetEvictable(set_evictable);
+    }
     latch_.unlock();
     return;
   }
@@ -100,6 +109,7 @@ void LRUKReplacer::Remove(frame_id_t frame_id) {
     BUSTUB_ASSERT((*iter)->IsEvictable(), "Remove unEvictable frame id.");
     temp_pool_.erase(iter);
     temp_map_.erase(frame_id);
+    evitable_size_--;
     latch_.unlock();
     return;
   }
@@ -108,6 +118,7 @@ void LRUKReplacer::Remove(frame_id_t frame_id) {
     BUSTUB_ASSERT((*iter)->IsEvictable(), "Remove unEvictable frame id.");
     cache_pool_.erase(iter);
     cache_map_.erase(frame_id);
+    evitable_size_--;
     latch_.unlock();
     return;
   }
@@ -115,20 +126,8 @@ void LRUKReplacer::Remove(frame_id_t frame_id) {
 }
 
 auto LRUKReplacer::Size() -> size_t {
-  latch_.lock();
-  size_t num = 0;
-  for (auto &ele : cache_pool_) {
-    if (ele->IsEvictable()) {
-      num++;
-    }
-  }
-  for (auto &ele : temp_pool_) {
-    if (ele->IsEvictable()) {
-      num++;
-    }
-  }
-  latch_.unlock();
-  return num;
+  std::scoped_lock<std::mutex> lock(latch_);
+  return evitable_size_;
 }
 
 LRUKReplacer::FrameInfo::FrameInfo(frame_id_t frame_id) : frame_id_(frame_id) {

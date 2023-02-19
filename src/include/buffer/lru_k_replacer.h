@@ -164,6 +164,7 @@ class LRUKReplacer {
   std::unordered_map<frame_id_t, std::list<std::unique_ptr<FrameInfo>>::iterator> cache_map_;
   std::list<std::unique_ptr<FrameInfo>> temp_pool_;
   std::unordered_map<frame_id_t, std::list<std::unique_ptr<FrameInfo>>::iterator> temp_map_;
+  size_t evitable_size_ = 0;
   std::mutex latch_;
 };
 
