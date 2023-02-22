@@ -32,7 +32,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, in
   SetSize(0);
   SetPageId(page_id);
   SetParentPageId(parent_id);
-  SetNextPageId();
+  SetNextPageId(INVALID_PAGE_ID);
   SetMaxSize(max_size);
 }
 
@@ -54,8 +54,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) {
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const -> KeyType {
   // replace with your own code
-  KeyType key{};
-  return key;
+  return array_[index].first;
 }
 
 template class BPlusTreeLeafPage<GenericKey<4>, RID, GenericComparator<4>>;
