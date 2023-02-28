@@ -21,7 +21,22 @@ BPLUSTREE_TYPE::BPlusTree(std::string name, BufferPoolManager *buffer_pool_manag
  * Helper function to decide whether current b+tree is empty
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return true; }
+auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return root_page_id_ == INVALID_PAGE_ID; }
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::FindLeaf(const KeyType &key) const -> Page * {
+  BUSTUB_ASSERT(root_page_id_ != INVALID_PAGE_ID, "Invalid root page id.");
+  Page *page = buffer_pool_manager_->FetchPage(root_page_id_);
+  BPlusTreePage *tree_page = reinterpret_cast<BPlusTreePage *>(page->GetData());
+  while (!tree_page->IsLeafPage()) {
+    InternalPage *internal_page = reinterpret_cast<InternalPage *>(tree_page);
+    auto page_id = internal_page->Lookup(key, comparator_);
+    page = buffer_pool_manager_->FetchPage(page_id);
+    tree_page = reinterpret_cast<BPlusTreePage *>(page->GetData());
+  }
+  return page;
+}
+
 /*****************************************************************************
  * SEARCH
  *****************************************************************************/
@@ -32,6 +47,13 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return true; }
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction) -> bool {
+  Page *page = FindLeaf(key);
+  LeafPage *leaf_page = reinterpret_cast<LeafPage *>(page->GetData());
+  ValueType value;
+  if (leaf_page->Lookup(key, &value, comparator_)) {
+    result->emplace_back(value);
+    return true;
+  }
   return false;
 }
 
@@ -47,6 +69,23 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) -> bool {
+  if (IsEmpty()) {
+    page_id_t page_id;
+    Page *new_page = buffer_pool_manager_->NewPage(&page_id);
+    if (new_page == nullptr) {
+      throw Exception(ExceptionType::OUT_OF_MEMORY, "Allocate new page failed.");
+    }
+    LeafPage *new_leaf = reinterpret_cast<LeafPage *>(new_page->GetData());
+    new_leaf->Init(page_id, INVALID_PAGE_ID, leaf_max_size_);
+    new_leaf->Insert(key, value, comparator_);
+    UpdateRootPageId(page_id);
+  }
+  Page *page = FindLeaf(key);
+  LeafPage *leaf = reinterpret_cast<LeafPage *>(page->GetData());
+  int size = leaf->Insert(key, value, comparator_);
+  if (size < leaf_max_size_) {
+    
+  }
   return false;
 }
 
@@ -94,7 +133,7 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE { return INDEXITERATOR_TYPE(); 
  * @return Page id of the root of this tree
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::GetRootPageId() -> page_id_t { return 0; }
+auto BPLUSTREE_TYPE::GetRootPageId() -> page_id_t { return root_page_id_; }
 
 /*****************************************************************************
  * UTILITIES AND DEBUG

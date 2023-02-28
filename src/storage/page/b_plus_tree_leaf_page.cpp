@@ -43,9 +43,7 @@ INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetNextPageId() const -> page_id_t { return INVALID_PAGE_ID; }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) {
-  next_page_id_ = next_page_id;
-}
+void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) { next_page_id_ = next_page_id; }
 
 /*
  * Helper method to find and return the key associated with input "index"(a.k.a
@@ -55,6 +53,40 @@ INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const -> KeyType {
   // replace with your own code
   return array_[index].first;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator &comparator) const -> int {
+  auto iter = std::lower_bound(array_, array_ + GetSize(), key,
+                               [&comparator](const auto &pair1, auto key) { return comparator(pair1.first, key) < 0; });
+  return std::distance(array_, iter);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+bool B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType *value, const KeyComparator &comparator) {
+  int index = KeyIndex(key, comparator);
+  if (index == GetSize() || comparator(KeyAt(index), key) != 0) {
+    return false;
+  }
+  *value = array_[index].second;
+  return true;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) {
+  int index = KeyIndex(key, comparator);
+  if (index == GetSize()) {
+    array_[index] = {key, value};
+    IncreaseSize(1);
+    return GetSize();
+  }
+  if (comparator(array_[index].first, key) == 0) {
+    return GetSize();
+  }
+  std::move_backward(array_ + index, array_ + GetSize(), array_ + GetSize() + 1);
+  array_[index] = {key, value};
+  IncreaseSize(1);
+  return GetSize();
 }
 
 template class BPlusTreeLeafPage<GenericKey<4>, RID, GenericComparator<4>>;
