@@ -82,11 +82,47 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
   }
   Page *page = FindLeaf(key);
   LeafPage *leaf = reinterpret_cast<LeafPage *>(page->GetData());
+  int old_size = leaf->GetSize();
   int size = leaf->Insert(key, value, comparator_);
-  if (size < leaf_max_size_) {
-    
+  if (size == old_size) {
+    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), false);
+    return false;
   }
+  if (size < leaf_max_size_) {
+    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
+    return true;
+  }
+  LeafPage *new_leaf = reinterpret_cast<LeafPage *>(Split(leaf));
+  new_leaf->SetNextPageId(leaf->GetNextPageId());
+  leaf->SetNextPageId(new_leaf->GetPageId());
+  InsertToParent(leaf, new_leaf);
   return false;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::Split(BPlusTreePage *page) -> BPlusTreePage * {
+  page_id_t page_id;
+  Page *new_page = buffer_pool_manager_->NewPage(&page_id);
+  if (new_page == nullptr) {
+    throw Exception(ExceptionType::OUT_OF_MEMORY, "New page failed.");
+  }
+  if (page->IsLeafPage()) {
+    LeafPage *leaf_page = reinterpret_cast<LeafPage *>(page);
+    LeafPage *new_leaf = reinterpret_cast<LeafPage *>(new_page->GetData());
+    new_leaf->Init(page_id, leaf_page->GetParentPageId(), leaf_max_size_);
+    leaf_page->MoveHalfTo(new_leaf);
+  } else {
+    InternalPage *internal = reinterpret_cast<InternalPage *>(page);
+    InternalPage *new_internal = reinterpret_cast<InternalPage *>(new_page->GetData());
+    new_internal->Init(page_id, internal->GetParentPageId(), internal_max_size_);
+    internal->MoveHalfTo(new_internal, buffer_pool_manager_);
+  }
+  return reinterpret_cast<BPlusTreePage *>(new_page->GetData());
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::InsertToParent(BPlusTreePage *old_page, BPlusTreePage *split_page) {
+  
 }
 
 /*****************************************************************************

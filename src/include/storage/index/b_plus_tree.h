@@ -84,6 +84,8 @@ class BPlusTree {
 
   auto FindLeaf(const KeyType &key) const -> Page *;
 
+  auto Split(BPlusTreePage *page) -> BPlusTreePage *;
+
   // member variable
   std::string index_name_;
   page_id_t root_page_id_;

@@ -52,6 +52,8 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto KeyIndex(const KeyType &key, const KeyComparator &comparator) const -> int;
   bool Lookup(const KeyType &key, ValueType *value, const KeyComparator &comparator);
   int Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator);
+  auto MoveHalfTo(BPlusTreeLeafPage *dst_page) -> void;
+  auto CopyData(MappingType *items, int size)->void
 
  private:
   page_id_t next_page_id_;

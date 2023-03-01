@@ -59,6 +59,26 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key, const KeyCompara
   return std::prev(target)->second;
 }
 
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage *dst_page, BufferPoolManager *bpm) {
+  int new_size = GetMinSize();
+  SetSize(new_size);
+  CopyData(array_, GetSize() - new_size, bpm);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyData(MappingType *items, int size, BufferPoolManager *bpm) -> void {
+  int original_size = GetSize();
+  std::copy(items, items + size, array_ + original_size);
+  IncreaseSize(size);
+  for (int index = 0; index < size; index++) {
+    Page *page = bpm->FetchPage(ValueAt(original_size + index));
+    BPlusTreeInternalPage *internal = reinterpret_cast<BPlusTreeInternalPage *>(page->GetData());
+    internal->SetParentPageId(GetPageId());
+    bpm->UnpinPage(page, true);
+  }
+}
+
 /*
  * Helper method to get the value associated with input "index"(a.k.a array
  * offset)
