@@ -86,6 +86,8 @@ class BPlusTree {
 
   auto Split(BPlusTreePage *page) -> BPlusTreePage *;
 
+  void InsertToParent(BPlusTreePage *old_page, BPlusTreePage *split_page, const KeyType &split_key);
+
   // member variable
   std::string index_name_;
   page_id_t root_page_id_;

@@ -46,6 +46,9 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) { array_[index].first = key; }
 
 INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetValueAt(int index, const ValueType &value) { array_[index].second = value; }
+
+INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key, const KeyComparator &comparator) const -> ValueType {
   auto target = std::lower_bound(array_ + 1, array_ + GetSize(), key, [&comparator](const auto &pair1, auto key) {
     return comparator(pair1.first, key) < 0;
@@ -60,10 +63,10 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key, const KeyCompara
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage *dst_page, BufferPoolManager *bpm) {
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage *dst_page, BufferPoolManager *bpm) -> void {
   int new_size = GetMinSize();
   SetSize(new_size);
-  CopyData(array_, GetSize() - new_size, bpm);
+  dst_page->CopyData(array_, GetSize() - new_size, bpm);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -75,7 +78,7 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyData(MappingType *items, int size, Buff
     Page *page = bpm->FetchPage(ValueAt(original_size + index));
     BPlusTreeInternalPage *internal = reinterpret_cast<BPlusTreeInternalPage *>(page->GetData());
     internal->SetParentPageId(GetPageId());
-    bpm->UnpinPage(page, true);
+    bpm->UnpinPage(page->GetPageId(), true);
   }
 }
 
@@ -85,6 +88,21 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyData(MappingType *items, int size, Buff
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const -> ValueType { return array_[index].second; }
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(ValueType &value) const -> int {
+  auto iter = std::find_if(array_, array_ + GetSize(), [&value](const auto &pair) { return pair.second == value; });
+  return std::distance(array_, iter);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAfter(page_id_t new_page_id, const KeyType &key, page_id_t old_page_id) {
+  int index = ValueIndex(new_page_id) + 1;
+  std::move_backward(array_ + index, array_ + GetSize(), array_ + GetSize() + 1);
+  IncreaseSize(1);
+  array_[index].first = key;
+  array_[index].second = new_page_id;
+}
 
 // valuetype for internalNode should be page id_t
 template class BPlusTreeInternalPage<GenericKey<4>, page_id_t, GenericComparator<4>>;

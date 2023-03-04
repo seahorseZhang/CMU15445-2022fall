@@ -97,7 +97,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *dst_page) -> void
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::CopyData(MappingType *items, int size)->void {
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::CopyData(MappingType *items, int size) -> void {
   std::copy(items, items + size, array_ + GetSize());
   IncreaseSize(size);
 }

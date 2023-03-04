@@ -95,7 +95,9 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
   LeafPage *new_leaf = reinterpret_cast<LeafPage *>(Split(leaf));
   new_leaf->SetNextPageId(leaf->GetNextPageId());
   leaf->SetNextPageId(new_leaf->GetPageId());
-  InsertToParent(leaf, new_leaf);
+  InsertToParent(leaf, new_leaf, new_leaf->KeyAt(1));
+  buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
+  buffer_pool_manager_->UnpinPage(new_leaf->GetPageId(), true);
   return false;
 }
 
@@ -121,8 +123,47 @@ auto BPLUSTREE_TYPE::Split(BPlusTreePage *page) -> BPlusTreePage * {
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::InsertToParent(BPlusTreePage *old_page, BPlusTreePage *split_page) {
-  
+void BPLUSTREE_TYPE::InsertToParent(BPlusTreePage *old_page, BPlusTreePage *split_page, const KeyType &split_key) {
+  int parent_id = old_page->GetParentPageId();
+  if (parent_id == INVALID_PAGE_ID) {
+    page_id_t root_id;
+    Page *page = buffer_pool_manager_->NewPage(&root_id);
+    InternalPage *root = reinterpret_cast<InternalPage *>(page->GetData());
+    root->Init(root_id, INVALID_PAGE_ID, internal_max_size_);
+    LeafPage *old_leaf = reinterpret_cast<LeafPage *>(old_page);
+    KeyType key = old_leaf->KeyAt(0);
+
+    root->SetKeyAt(1, key);
+    root->SetValueAt(0, old_leaf->GetPageId());
+    root->SetValueAt(1, page->GetPageId());
+    root->SetSize(2);
+
+    old_page->SetParentPageId(root_id);
+    split_page->SetParentPageId(root_id);
+
+    buffer_pool_manager_->UnpinPage(root_id, true);
+    return;
+  }
+
+  // Insert the split page into parent page directly when parent page is not full.
+  Page *root_page = buffer_pool_manager_->FetchPage(parent_id);
+  InternalPage *root = reinterpret_cast<InternalPage *>(root_page->GetData());
+  if (root->GetSize() < internal_max_size_) {
+    root->InsertNodeAfter(split_page->GetPageId(), split_key, old_page->GetPageId());
+    buffer_pool_manager_->UnpinPage(root->GetPageId(), true);
+    return;
+  }
+
+  // Split again when parent is full.
+  InternalPage *new_parent_page = reinterpret_cast<InternalPage *>(Split(root));
+  int size = new_parent_page->GetSize();
+  new_parent_page->SetKeyAt(size, split_key);
+  new_parent_page->SetValueAt(size, split_page->GetPageId());
+  new_parent_page->IncreaseSize(1);
+
+  InsertToParent(root, new_parent_page, new_parent_page->KeyAt(0));
+  buffer_pool_manager_->UnpinPage(root->GetPageId(), true);
+  buffer_pool_manager_->UnpinPage(new_parent_page->GetPageId(), true);
 }
 
 /*****************************************************************************
