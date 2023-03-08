@@ -92,7 +92,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &valu
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *dst_page) -> void {
   int new_size = GetMinSize();
-  dst_page->CopyData(array_, GetSize() - new_size);
+  dst_page->CopyData(array_ + GetMinSize(), GetSize() - new_size);
   SetSize(new_size);
 }
 

@@ -70,15 +70,16 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) -> bool {
   if (IsEmpty()) {
-    page_id_t page_id;
-    Page *new_page = buffer_pool_manager_->NewPage(&page_id);
+    Page *new_page = buffer_pool_manager_->NewPage(&root_page_id_);
     if (new_page == nullptr) {
       throw Exception(ExceptionType::OUT_OF_MEMORY, "Allocate new page failed.");
     }
     LeafPage *new_leaf = reinterpret_cast<LeafPage *>(new_page->GetData());
-    new_leaf->Init(page_id, INVALID_PAGE_ID, leaf_max_size_);
+    new_leaf->Init(root_page_id_, INVALID_PAGE_ID, leaf_max_size_);
     new_leaf->Insert(key, value, comparator_);
-    UpdateRootPageId(page_id);
+    buffer_pool_manager_->UnpinPage(root_page_id_, true);
+    UpdateRootPageId(1);
+    return true;
   }
   Page *page = FindLeaf(key);
   LeafPage *leaf = reinterpret_cast<LeafPage *>(page->GetData());
@@ -88,7 +89,7 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
     buffer_pool_manager_->UnpinPage(leaf->GetPageId(), false);
     return false;
   }
-  if (size < leaf_max_size_) {
+  if (size <= leaf_max_size_) {
     buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
     return true;
   }
@@ -124,28 +125,28 @@ auto BPLUSTREE_TYPE::Split(BPlusTreePage *page) -> BPlusTreePage * {
 
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::InsertToParent(BPlusTreePage *old_page, BPlusTreePage *split_page, const KeyType &split_key) {
-  int parent_id = old_page->GetParentPageId();
-  if (parent_id == INVALID_PAGE_ID) {
-    page_id_t root_id;
-    Page *page = buffer_pool_manager_->NewPage(&root_id);
+  if (old_page->IsRootPage()) {
+    Page *page = buffer_pool_manager_->NewPage(&root_page_id_);
     InternalPage *root = reinterpret_cast<InternalPage *>(page->GetData());
-    root->Init(root_id, INVALID_PAGE_ID, internal_max_size_);
-    LeafPage *old_leaf = reinterpret_cast<LeafPage *>(old_page);
-    KeyType key = old_leaf->KeyAt(0);
+    root->Init(root_page_id_, INVALID_PAGE_ID, internal_max_size_);
+    LeafPage *split_leaf = reinterpret_cast<LeafPage *>(old_page);
+    KeyType key = split_leaf->KeyAt(0);
 
     root->SetKeyAt(1, key);
-    root->SetValueAt(0, old_leaf->GetPageId());
-    root->SetValueAt(1, page->GetPageId());
+    root->SetValueAt(0, old_page->GetPageId());
+    root->SetValueAt(1, split_page->GetPageId());
     root->SetSize(2);
 
-    old_page->SetParentPageId(root_id);
-    split_page->SetParentPageId(root_id);
+    old_page->SetParentPageId(root_page_id_);
+    split_page->SetParentPageId(root_page_id_);
+    UpdateRootPageId(0);
 
-    buffer_pool_manager_->UnpinPage(root_id, true);
+    buffer_pool_manager_->UnpinPage(root_page_id_, true);
     return;
   }
 
   // Insert the split page into parent page directly when parent page is not full.
+  int parent_id = old_page->GetParentPageId();
   Page *root_page = buffer_pool_manager_->FetchPage(parent_id);
   InternalPage *root = reinterpret_cast<InternalPage *>(root_page->GetData());
   if (root->GetSize() < internal_max_size_) {

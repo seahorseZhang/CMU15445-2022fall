@@ -26,7 +26,7 @@ namespace bustub {
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, int max_size) {
-  SetPageType(IndexPageType::LEAF_PAGE);
+  SetPageType(IndexPageType::INTERNAL_PAGE);
   SetSize(0);
   SetPageId(page_id);
   SetParentPageId(parent_id);
@@ -97,7 +97,7 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(ValueType &value) const -> int {
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAfter(page_id_t new_page_id, const KeyType &key, page_id_t old_page_id) {
-  int index = ValueIndex(new_page_id) + 1;
+  int index = ValueIndex(old_page_id) + 1;
   std::move_backward(array_ + index, array_ + GetSize(), array_ + GetSize() + 1);
   IncreaseSize(1);
   array_[index].first = key;
