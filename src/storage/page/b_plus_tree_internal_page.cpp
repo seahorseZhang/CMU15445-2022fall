@@ -65,17 +65,16 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key, const KeyCompara
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage *dst_page, BufferPoolManager *bpm) -> void {
   int new_size = GetMinSize();
+  dst_page->CopyData(array_ + new_size, GetSize() - new_size, bpm);
   SetSize(new_size);
-  dst_page->CopyData(array_, GetSize() - new_size, bpm);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyData(MappingType *items, int size, BufferPoolManager *bpm) -> void {
-  int original_size = GetSize();
-  std::copy(items, items + size, array_ + original_size);
+  std::copy(items, items + size, array_);
   IncreaseSize(size);
   for (int index = 0; index < size; index++) {
-    Page *page = bpm->FetchPage(ValueAt(original_size + index));
+    Page *page = bpm->FetchPage(ValueAt(index));
     BPlusTreeInternalPage *internal = reinterpret_cast<BPlusTreeInternalPage *>(page->GetData());
     internal->SetParentPageId(GetPageId());
     bpm->UnpinPage(page->GetPageId(), true);
