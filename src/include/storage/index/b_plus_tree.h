@@ -88,6 +88,17 @@ class BPlusTree {
 
   void InsertToParent(BPlusTreePage *old_page, BPlusTreePage *split_page, const KeyType &split_key);
 
+  template <typename Node>
+  auto RedistributeLeft(Node *sibling_node, Node *target_node, InternalPage *parent, int index) -> void;
+
+  template <typename Node>
+  auto RedistributeRight(Node *sibling_node, Node *target_node, InternalPage *parent, int index) -> void;
+
+  template <typename Node>
+  auto Merge(Node *dst_node, Node *src_node, InternalPage *parent, int index) -> void;
+
+  auto RedistributeOrMerge(BPlusTreePage *node) -> void;
+
   // member variable
   std::string index_name_;
   page_id_t root_page_id_;

@@ -21,9 +21,11 @@ namespace bustub {
 
 INDEX_TEMPLATE_ARGUMENTS
 class IndexIterator {
+  using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
+
  public:
   // you may define your own constructor based on your member variables
-  IndexIterator();
+  IndexIterator(BufferPoolManager *bpm, LeafPage *leaf, int index = 0);
   ~IndexIterator();  // NOLINT
 
   auto IsEnd() -> bool;
@@ -32,12 +34,19 @@ class IndexIterator {
 
   auto operator++() -> IndexIterator &;
 
-  auto operator==(const IndexIterator &itr) const -> bool { throw std::runtime_error("unimplemented"); }
+  auto operator==(const IndexIterator &itr) const -> bool {
+    return leaf_->GetPageId() == itr.leaf_->GetPageId() && index_ == itr.index_;
+  }
 
-  auto operator!=(const IndexIterator &itr) const -> bool { throw std::runtime_error("unimplemented"); }
+  auto operator!=(const IndexIterator &itr) const -> bool {
+    return leaf_->GetPageId() != itr.leaf_->GetPageId() || index_ != itr.index_;
+  }
 
  private:
   // add your own private member variables here
+  BufferPoolManager *bpm_;
+  LeafPage *leaf_;
+  int index_;
 };
 
 }  // namespace bustub

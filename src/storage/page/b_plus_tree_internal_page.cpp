@@ -70,15 +70,52 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage *dst_page,
 }
 
 INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(BPlusTreeInternalPage *dst_page, BufferPoolManager *bpm) -> void {
+  dst_page->CopyData(array_, GetSize(), bpm);
+  SetSize(0);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyData(MappingType *items, int size, BufferPoolManager *bpm) -> void {
   std::copy(items, items + size, array_);
   IncreaseSize(size);
   for (int index = 0; index < size; index++) {
     Page *page = bpm->FetchPage(ValueAt(index));
-    BPlusTreeInternalPage *internal = reinterpret_cast<BPlusTreeInternalPage *>(page->GetData());
+    auto *internal = reinterpret_cast<BPlusTreeInternalPage *>(page->GetData());
     internal->SetParentPageId(GetPageId());
     bpm->UnpinPage(page->GetPageId(), true);
   }
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Remove(int index) -> void {
+  std::move(array_ + index + 1, array_ + GetSize(), array_ + index);
+  IncreaseSize(-1);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertToEnd(const KeyType &key, const ValueType &value, BufferPoolManager *bpm) {
+  int size = GetSize();
+  array_[size] = {key, value};
+  IncreaseSize(1);
+  auto page_id = reinterpret_cast<page_id_t>(value);
+  Page *page = bpm->FetchPage(page_id);
+  auto *b_plus_page = reinterpret_cast<BPlusTreePage *>(page->GetData());
+  b_plus_page->SetParentPageId(GetPageId());
+  bpm->UnpinPage(page_id, true);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertToStart(const KeyType &key, const ValueType &value, BufferPoolManager *bpm) {
+  int size = GetSize();
+  std::move_backward(array_, array_ + size, array_ + 1);
+  array_[0] = {key, value};
+  IncreaseSize(1);
+  auto page_id = reinterpret_cast<page_id_t>(value);
+  Page *page = bpm->FetchPage(page_id);
+  auto *b_plus_page = reinterpret_cast<BPlusTreePage *>(page->GetData());
+  b_plus_page->SetParentPageId(GetPageId());
+  bpm->UnpinPage(page_id, true);
 }
 
 /*
@@ -89,7 +126,7 @@ INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const -> ValueType { return array_[index].second; }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(ValueType &value) const -> int {
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(const ValueType &value) const -> int {
   auto iter = std::find_if(array_, array_ + GetSize(), [&value](const auto &pair) { return pair.second == value; });
   return std::distance(array_, iter);
 }
