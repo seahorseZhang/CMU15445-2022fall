@@ -80,7 +80,7 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
     std::cout << "Insert operation, b plus tree is empty, new page." << std::endl;
     Page *new_page = buffer_pool_manager_->NewPage(&root_page_id_);
     if (new_page == nullptr) {
-      throw Exception(ExceptionType::OUT_OF_MEMORY, "Allocate new page failed.");
+      throw Exception(ExceptionType::OUT_OF_MEMORY, "Allocate new page failed when b+ tree insert.");
     }
     auto *new_leaf = reinterpret_cast<LeafPage *>(new_page->GetData());
     new_leaf->Init(root_page_id_, INVALID_PAGE_ID, leaf_max_size_);
