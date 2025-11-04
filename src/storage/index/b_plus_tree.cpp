@@ -265,6 +265,8 @@ void BPLUSTREE_TYPE::Merge(Node *dst_node, Node *src_node, InternalPage *parent,
     auto *src_page = reinterpret_cast<InternalPage *>(src_node);
     auto *dst_page = reinterpret_cast<InternalPage *>(dst_node);
     src_page->MoveAllTo(dst_page, buffer_pool_manager_);
+    src_node->SetParentPageId(INVALID_PAGE_ID);
+    buffer_pool_manager_->DeletePage(src_page->GetPageId());
   }
   parent->Remove(index);
   if (parent->GetSize() < parent->GetMinSize()) {
@@ -303,13 +305,13 @@ void BPLUSTREE_TYPE::RedistributeRight(Node *sibling_node, Node *target_node, In
     auto *target_page = reinterpret_cast<LeafPage *>(target_node);
     key = sibling_page->KeyAt(0);
     target_page->Insert(key, sibling_page->ValueAt(0), comparator_);
-    sibling_page->IncreaseSize(-1);
+    sibling_page->Remove(key, comparator_);
   } else {
     auto *sibling_internal = reinterpret_cast<InternalPage *>(sibling_node);
     auto *target_internal = reinterpret_cast<InternalPage *>(target_node);
     key = sibling_internal->KeyAt(1);
     target_internal->InsertToEnd(key, sibling_internal->ValueAt(1), buffer_pool_manager_);
-    sibling_internal->IncreaseSize(-1);
+    sibling_internal->Remove(0);
   }
   parent->SetKeyAt(index + 1, key);
 }
@@ -364,6 +366,7 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE {
     auto *internal_page = reinterpret_cast<InternalPage *>(tree_page);
     int index = internal_page->GetSize() - 1;
     page_id_t page_id = internal_page->ValueAt(index);
+    buffer_pool_manager_->UnpinPage(page_id, false);
     tree_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(page_id)->GetData());
   }
   auto *leaf = reinterpret_cast<LeafPage *>(tree_page);

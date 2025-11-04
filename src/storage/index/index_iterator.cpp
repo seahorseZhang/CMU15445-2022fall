@@ -41,10 +41,10 @@ auto INDEXITERATOR_TYPE::operator++() -> INDEXITERATOR_TYPE & {
       leaf_ = reinterpret_cast<LeafPage *>(page->GetData());
       index_ = 0;
     } else {
-       leaf_ = nullptr;
+       ++index_;
     }
   } else {
-    index_++;
+      ++index_;
   }
   return *this;
 }

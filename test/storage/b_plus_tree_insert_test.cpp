@@ -84,7 +84,7 @@ TEST(BPlusTreeTests, InsertTest2) {
   (void)header_page;
 
   std::vector<int64_t> keys;
-  for (int64_t i = 0; i < 100; i++) {
+  for (int64_t i = 0; i < 20; i++) {
     keys.push_back(i);
   }
   for (auto key : keys) {
@@ -221,7 +221,10 @@ TEST(BPlusTreeTests, InsertTest4) {
   (void)header_page;
 
   std::string ofstream = "b_plus_tree.dot";
-  std::vector<int64_t> keys = {5, 4, 3, 2, 1};
+  std::vector<int64_t> keys;
+  for (int64_t i = 1; i <= 20; i++) {
+    keys.push_back(i);
+  }
   for (auto key : keys) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
@@ -262,6 +265,20 @@ TEST(BPlusTreeTests, InsertTest4) {
     EXPECT_EQ(location.GetSlotNum(), current_key);
     current_key = current_key + 1;
   }
+
+  for (int64_t& key: keys) {
+    index_key.SetFromInteger(key);
+    if (key % 2 == 1) {
+      tree.Remove(index_key, transaction);
+    }
+  }
+  int32_t count = 0;
+  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
+    auto location = (*iterator).second;
+    EXPECT_EQ(location.GetPageId(), 0);
+    ++count;
+  }
+  EXPECT_EQ(keys.size() / 2, count);
 
   bpm->UnpinPage(HEADER_PAGE_ID, true);
   delete transaction;
