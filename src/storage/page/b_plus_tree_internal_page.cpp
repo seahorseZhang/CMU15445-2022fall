@@ -77,9 +77,10 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(BPlusTreeInternalPage *dst_page, 
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyData(MappingType *items, int size, BufferPoolManager *bpm) -> void {
-  std::copy(items, items + size, array_);
+  std::copy(items, items + size, array_ + GetSize());
+  int start = GetSize();
   IncreaseSize(size);
-  for (int index = 0; index < size; index++) {
+  for (int index = start; index < start + size; index++) {
     Page *page = bpm->FetchPage(ValueAt(index));
     auto *internal = reinterpret_cast<BPlusTreeInternalPage *>(page->GetData());
     internal->SetParentPageId(GetPageId());

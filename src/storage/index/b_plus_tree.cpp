@@ -205,8 +205,26 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
 }
 
 INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::AdjustRoot(BPlusTreePage *rootPage) {
+    if (rootPage->GetSize() > 1 || rootPage->IsLeafPage()) {
+      return;
+    }
+    InternalPage *iternal_root = reinterpret_cast<InternalPage *>(rootPage);
+    page_id_t child_id = iternal_root->ValueAt(0);
+    Page *only_child = buffer_pool_manager_->FetchPage(child_id);
+    BPlusTreePage *tree_page  = reinterpret_cast<BPlusTreePage *>(only_child->GetData());
+    tree_page->SetParentPageId(INVALID_PAGE_ID);
+    root_page_id_ = tree_page->GetPageId();
+    buffer_pool_manager_->UnpinPage(iternal_root->GetPageId(), true);
+    buffer_pool_manager_->DeletePage(iternal_root->GetPageId());
+    buffer_pool_manager_->UnpinPage(child_id, true);
+    UpdateRootPageId(0);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::RedistributeOrMerge(BPlusTreePage *node) {
   if (node->IsRootPage()) {
+    AdjustRoot(node);
     return;
   }
   // The size is smaller than the min size, try to borrow from siblings.
@@ -256,18 +274,19 @@ void BPLUSTREE_TYPE::RedistributeOrMerge(BPlusTreePage *node) {
 
 INDEX_TEMPLATE_ARGUMENTS
 template <typename Node>
-void BPLUSTREE_TYPE::Merge(Node *dst_node, Node *src_node, InternalPage *parent, int index) {
-  if (dst_node->IsLeafPage()) {
-    auto *src_page = reinterpret_cast<LeafPage *>(src_node);
-    auto *dst_page = reinterpret_cast<LeafPage *>(dst_node);
+void BPLUSTREE_TYPE::Merge(Node *prev_dst_node, Node *src_node, InternalPage *parent, int index) {
+  if (prev_dst_node->IsLeafPage()) {
+    LeafPage *src_page = reinterpret_cast<LeafPage *>(src_node);
+    LeafPage *dst_page = reinterpret_cast<LeafPage *>(prev_dst_node);
     src_page->MoveAllTo(dst_page);
   } else {
-    auto *src_page = reinterpret_cast<InternalPage *>(src_node);
-    auto *dst_page = reinterpret_cast<InternalPage *>(dst_node);
+    InternalPage *src_page = reinterpret_cast<InternalPage *>(src_node);
+    InternalPage *dst_page = reinterpret_cast<InternalPage *>(prev_dst_node);
+    src_page->SetKeyAt(0, parent->KeyAt(index));
     src_page->MoveAllTo(dst_page, buffer_pool_manager_);
-    src_node->SetParentPageId(INVALID_PAGE_ID);
-    buffer_pool_manager_->DeletePage(src_page->GetPageId());
   }
+  src_node->SetParentPageId(INVALID_PAGE_ID);
+  buffer_pool_manager_->DeletePage(src_node->GetPageId());
   parent->Remove(index);
   if (parent->GetSize() < parent->GetMinSize()) {
     RedistributeOrMerge(parent);

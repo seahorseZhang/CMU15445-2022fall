@@ -99,6 +99,8 @@ class BPlusTree {
 
   auto RedistributeOrMerge(BPlusTreePage *node) -> void;
 
+  void AdjustRoot(BPlusTreePage *rootPage);
+
   // member variable
   std::string index_name_;
   page_id_t root_page_id_;
