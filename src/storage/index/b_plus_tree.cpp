@@ -190,7 +190,7 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
     return;
   }
   Page *page = FindLeaf(key);
-  auto *tree_page = reinterpret_cast<LeafPage *>(page->GetData());
+  LeafPage *tree_page = reinterpret_cast<LeafPage *>(page->GetData());
   bool result = tree_page->Remove(key, comparator_);
   // Return immediately if key is not find.
   if (!result) {
@@ -272,6 +272,7 @@ void BPLUSTREE_TYPE::RedistributeOrMerge(BPlusTreePage *node) {
   }
 }
 
+// prev_dst_node左page，src_node右page，最终只留下prev_dst_node
 INDEX_TEMPLATE_ARGUMENTS
 template <typename Node>
 void BPLUSTREE_TYPE::Merge(Node *prev_dst_node, Node *src_node, InternalPage *parent, int index) {
@@ -279,6 +280,7 @@ void BPLUSTREE_TYPE::Merge(Node *prev_dst_node, Node *src_node, InternalPage *pa
     LeafPage *src_page = reinterpret_cast<LeafPage *>(src_node);
     LeafPage *dst_page = reinterpret_cast<LeafPage *>(prev_dst_node);
     src_page->MoveAllTo(dst_page);
+    dst_page->SetNextPageId(src_page->GetNextPageId());
   } else {
     InternalPage *src_page = reinterpret_cast<InternalPage *>(src_node);
     InternalPage *dst_page = reinterpret_cast<InternalPage *>(prev_dst_node);
@@ -305,11 +307,11 @@ void BPLUSTREE_TYPE::RedistributeLeft(Node *sibling_node, Node *target_node, Int
     target_page->Insert(key, sibling_page->ValueAt(left_index), comparator_);
     sibling_page->IncreaseSize(-1);
   } else {
-    auto *sibling_internal = reinterpret_cast<InternalPage *>(sibling_node);
-    auto *target_internal = reinterpret_cast<InternalPage *>(target_node);
+    InternalPage *sibling_internal = reinterpret_cast<InternalPage *>(sibling_node);
+    InternalPage *target_internal = reinterpret_cast<InternalPage *>(target_node);
     int left_index = sibling_internal->GetSize() - 1;
     key = sibling_internal->KeyAt(left_index);
-    target_internal->InsertToStart(key, sibling_internal->ValueAt(index), buffer_pool_manager_);
+    target_internal->InsertToStart(key, sibling_internal->ValueAt(left_index), buffer_pool_manager_);
     sibling_internal->IncreaseSize(-1);
   }
   parent->SetKeyAt(index, key);
