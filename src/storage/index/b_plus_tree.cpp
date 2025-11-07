@@ -329,20 +329,23 @@ INDEX_TEMPLATE_ARGUMENTS
 template <typename Node>
 void BPLUSTREE_TYPE::RedistributeRight(Node *sibling_node, Node *target_node, InternalPage *parent, int index) {
   KeyType key;
+  KeyType new_right_key;
   if (sibling_node->IsLeafPage()) {
-    auto *sibling_page = reinterpret_cast<LeafPage *>(sibling_node);
-    auto *target_page = reinterpret_cast<LeafPage *>(target_node);
+    LeafPage *sibling_page = reinterpret_cast<LeafPage *>(sibling_node);
+    LeafPage *target_page = reinterpret_cast<LeafPage *>(target_node);
     key = sibling_page->KeyAt(0);
     target_page->Insert(key, sibling_page->ValueAt(0), comparator_);
     sibling_page->Remove(key, comparator_);
+    new_right_key = sibling_page->KeyAt(0);
   } else {
     InternalPage *sibling_internal = reinterpret_cast<InternalPage *>(sibling_node);
     InternalPage *target_internal = reinterpret_cast<InternalPage *>(target_node);
     key = sibling_internal->KeyAt(0);
     target_internal->InsertToEnd(key, sibling_internal->ValueAt(0), buffer_pool_manager_);
     sibling_internal->Remove(0);
+    new_right_key = sibling_internal->KeyAt(0);
   }
-  parent->SetKeyAt(index + 1, key);
+  parent->SetKeyAt(index + 1, new_right_key);
 }
 
 /*****************************************************************************
