@@ -312,6 +312,14 @@ void BPLUSTREE_TYPE::RedistributeLeft(Node *sibling_node, Node *target_node, Int
     int left_index = sibling_internal->GetSize() - 1;
     key = sibling_internal->KeyAt(left_index);
     target_internal->InsertToStart(key, sibling_internal->ValueAt(left_index), buffer_pool_manager_);
+    page_id_t sibling_last = sibling_internal->ValueAt(left_index);
+    Page *last_page = buffer_pool_manager_->FetchPage(sibling_last);
+    BPlusTreePage *last_tree_page = reinterpret_cast<BPlusTreePage *>(last_page->GetData());
+    if (last_tree_page->IsLeafPage()) {
+      LeafPage *page = reinterpret_cast<LeafPage *>(last_tree_page);
+      page->SetNextPageId(target_internal->ValueAt(1));
+    }
+    buffer_pool_manager_->UnpinPage(sibling_last, true);
     sibling_internal->IncreaseSize(-1);
   }
   parent->SetKeyAt(index, key);
@@ -328,10 +336,10 @@ void BPLUSTREE_TYPE::RedistributeRight(Node *sibling_node, Node *target_node, In
     target_page->Insert(key, sibling_page->ValueAt(0), comparator_);
     sibling_page->Remove(key, comparator_);
   } else {
-    auto *sibling_internal = reinterpret_cast<InternalPage *>(sibling_node);
-    auto *target_internal = reinterpret_cast<InternalPage *>(target_node);
-    key = sibling_internal->KeyAt(1);
-    target_internal->InsertToEnd(key, sibling_internal->ValueAt(1), buffer_pool_manager_);
+    InternalPage *sibling_internal = reinterpret_cast<InternalPage *>(sibling_node);
+    InternalPage *target_internal = reinterpret_cast<InternalPage *>(target_node);
+    key = sibling_internal->KeyAt(0);
+    target_internal->InsertToEnd(key, sibling_internal->ValueAt(0), buffer_pool_manager_);
     sibling_internal->Remove(0);
   }
   parent->SetKeyAt(index + 1, key);

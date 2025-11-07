@@ -199,6 +199,16 @@ TEST(BPlusTreeTests, InsertTest3) {
   remove("test.log");
 }
 
+void AssertTreeCount(BPlusTree<GenericKey<8>, RID, GenericComparator<8>>& tree, int32_t expectCount) {
+    int32_t count = 0;
+    for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
+      auto location = (*iterator).second;
+      EXPECT_EQ(location.GetPageId(), 0);
+      ++count;
+    }
+    EXPECT_EQ(expectCount, count);
+}
+
 // test btree split
 TEST(BPlusTreeTests, InsertTest4) {
   // create KeyComparator and index schema
@@ -266,19 +276,14 @@ TEST(BPlusTreeTests, InsertTest4) {
     current_key = current_key + 1;
   }
 
+  int32_t expectCount = keys.size();
   for (int64_t& key: keys) {
     index_key.SetFromInteger(key);
     if (key % 2 == 1) {
       tree.Remove(index_key, transaction);
+      AssertTreeCount(tree, --expectCount);
     }
   }
-  int32_t count = 0;
-  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
-    auto location = (*iterator).second;
-    EXPECT_EQ(location.GetPageId(), 0);
-    ++count;
-  }
-  EXPECT_EQ(keys.size() / 2, count);
 
   bpm->UnpinPage(HEADER_PAGE_ID, true);
   delete transaction;
