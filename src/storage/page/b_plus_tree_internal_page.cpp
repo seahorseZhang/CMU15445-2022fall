@@ -49,6 +49,14 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetValueAt(int index, const ValueType &value) { array_[index].second = value; }
 
 INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyPos(const KeyType &key, const KeyComparator &comparator) const -> int {
+  auto target = std::lower_bound(array_, array_ + GetSize(), key, [&comparator](const auto &pair1, auto key) {
+    return comparator(pair1.first, key) < 0;
+  });
+  return std::distance(array_, target);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key, const KeyComparator &comparator) const -> ValueType {
   auto target = std::lower_bound(array_ + 1, array_ + GetSize(), key, [&comparator](const auto &pair1, auto key) {
     return comparator(pair1.first, key) < 0;

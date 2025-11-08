@@ -209,7 +209,6 @@ void AssertTreeCount(BPlusTree<GenericKey<8>, RID, GenericComparator<8>>& tree, 
     EXPECT_EQ(expectCount, count);
 }
 
-// test btree split
 TEST(BPlusTreeTests, InsertTest4) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
@@ -240,7 +239,6 @@ TEST(BPlusTreeTests, InsertTest4) {
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
-    tree.Draw(bpm, ofstream);
   }
 
   std::vector<RID> rids;
@@ -278,10 +276,100 @@ TEST(BPlusTreeTests, InsertTest4) {
 
   int32_t expectCount = keys.size();
   for (int64_t& key: keys) {
-    index_key.SetFromInteger(key);
     if (key % 2 == 1) {
+      index_key.SetFromInteger(key);
       tree.Remove(index_key, transaction);
       AssertTreeCount(tree, --expectCount);
+    }
+  }
+  tree.Draw(bpm, ofstream);
+
+  for (int64_t& key: keys) {
+    if (key % 2 == 0) {
+      index_key.SetFromInteger(key);
+      rids.clear();
+      tree.GetValue(index_key, &rids);
+      EXPECT_EQ(rids.size(), 1);
+    }
+  }
+
+  bpm->UnpinPage(HEADER_PAGE_ID, true);
+  delete transaction;
+  delete disk_manager;
+  delete bpm;
+  remove("test.db");
+  remove("test.log");
+}
+
+// test btree split
+TEST(BPlusTreeTests, InsertTest5) {
+  // create KeyComparator and index schema
+  auto key_schema = ParseCreateStatement("a bigint");
+  GenericComparator<8> comparator(key_schema.get());
+
+  auto *disk_manager = new DiskManager("test.db");
+  BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
+  // create b+ tree
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 6, 4);
+  GenericKey<8> index_key;
+  RID rid;
+  // create transaction
+  auto *transaction = new Transaction(0);
+
+  // create and fetch header_page
+  page_id_t page_id;
+  auto header_page = bpm->NewPage(&page_id);
+  ASSERT_EQ(page_id, HEADER_PAGE_ID);
+  (void)header_page;
+
+  std::string ofstream = "b_plus_tree.dot";
+  std::vector<int64_t> keys;
+  for (int64_t i = 1; i <= 100; i++) {
+    keys.push_back(i);
+  }
+  for (auto key : keys) {
+    int64_t value = key & 0xFFFFFFFF;
+    rid.Set(static_cast<int32_t>(key >> 32), value);
+    index_key.SetFromInteger(key);
+    tree.Insert(index_key, rid, transaction);
+  }
+
+  std::vector<RID> rids;
+  for (auto key : keys) {
+    rids.clear();
+    index_key.SetFromInteger(key);
+    tree.GetValue(index_key, &rids);
+    EXPECT_EQ(rids.size(), 1);
+
+    int64_t value = key & 0xFFFFFFFF;
+    EXPECT_EQ(rids[0].GetSlotNum(), value);
+  }
+
+  int count = 0;
+  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
+    auto location = (*iterator).second;
+    EXPECT_EQ(location.GetPageId(), 0);
+    ++count;
+  }
+  EXPECT_EQ(keys.size(), count);
+
+  int32_t expectCount = keys.size();
+  for (int64_t& key: keys) {
+    if (key % 4 == 1) {
+      index_key.SetFromInteger(key);
+      tree.Remove(index_key, transaction);
+      AssertTreeCount(tree, --expectCount);
+    }
+  }
+  tree.Draw(bpm, ofstream);
+
+  // check the correctness of b+ tree
+  for (int64_t& key: keys) {
+    if (key % 4 != 1) {
+      index_key.SetFromInteger(key);
+      rids.clear();
+      tree.GetValue(index_key, &rids);
+      EXPECT_EQ(rids.size(), 1);
     }
   }
 

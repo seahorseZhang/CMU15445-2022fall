@@ -43,6 +43,7 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   auto ValueAt(int index) const -> ValueType;
   void SetValueAt(int index, const ValueType &value);
   auto Lookup(const KeyType &key, const KeyComparator &comparator) const -> ValueType;
+  auto KeyPos(const KeyType &key, const KeyComparator &comparator) const -> int;
   auto MoveHalfTo(BPlusTreeInternalPage *dst_page, BufferPoolManager *bpm) -> void;
   auto MoveAllTo(BPlusTreeInternalPage *dst_page, BufferPoolManager *bpm) -> void;
   auto CopyData(MappingType *items, int size, BufferPoolManager *bpm) -> void;

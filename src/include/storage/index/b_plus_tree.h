@@ -101,6 +101,8 @@ class BPlusTree {
 
   void AdjustRoot(BPlusTreePage *rootPage);
 
+  void UpdateParentPageKey(BPlusTreePage *tree_page,const KeyType &old_key, const KeyType &new_key);
+
   // member variable
   std::string index_name_;
   page_id_t root_page_id_;
