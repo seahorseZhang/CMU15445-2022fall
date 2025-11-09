@@ -122,6 +122,9 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::CopyData(MappingType *items, int size) -> void 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::Remove(const KeyType &key, const KeyComparator &comparator) -> bool {
   int index = KeyIndex(key, comparator);
+  if (index >= GetSize()) {
+    return false;
+  }
   if (comparator(array_[index].first, key) == 0) {
     int size = GetSize();
     std::move(array_ + index + 1, array_ + size, array_ + index);
