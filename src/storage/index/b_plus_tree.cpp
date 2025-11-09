@@ -98,7 +98,6 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
     buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
     return true;
   }
-  std::cout << "Insert operation, split into new leaf. " << std::endl;
   auto *new_leaf = reinterpret_cast<LeafPage *>(Split(leaf));
   new_leaf->SetNextPageId(leaf->GetNextPageId());
   leaf->SetNextPageId(new_leaf->GetPageId());
@@ -176,7 +175,7 @@ void BPLUSTREE_TYPE::UpdateParentPageKey(BPlusTreePage *tree_page,const KeyType 
     Page *page = buffer_pool_manager_->FetchPage(parent_id);
     InternalPage *internal_parent = reinterpret_cast<InternalPage *>(page->GetData());
     int index = internal_parent->KeyPos(old_key, comparator_);
-    assert(index < internal_parent->GetSize());
+    BUSTUB_ASSERT(index < internal_parent->GetSize(), "key pos greater than parent size");
     internal_parent->SetKeyAt(index, new_key);
     if (index == 0) {
       UpdateParentPageKey(internal_parent, old_key, new_key);
@@ -291,7 +290,7 @@ void BPLUSTREE_TYPE::RedistributeOrMerge(BPlusTreePage *node) {
 INDEX_TEMPLATE_ARGUMENTS
 template <typename Node>
 void BPLUSTREE_TYPE::Merge(Node *prev_dst_node, Node *src_node, InternalPage *parent, int index) {
-  assert(index > 0);
+  BUSTUB_ASSERT(index > 0, "merge node index not greater than zero");
   KeyType new_key;
   if (prev_dst_node->IsLeafPage()) {
     LeafPage *src_page = reinterpret_cast<LeafPage *>(src_node);
@@ -411,10 +410,10 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE {
   Page *root_page = buffer_pool_manager_->FetchPage(root_page_id_);
   auto *tree_page = reinterpret_cast<BPlusTreePage *>(root_page->GetData());
   while (!tree_page->IsLeafPage()) {
-    auto *internal_page = reinterpret_cast<InternalPage *>(tree_page);
+    InternalPage *internal_page = reinterpret_cast<InternalPage *>(tree_page);
     int index = internal_page->GetSize() - 1;
     page_id_t page_id = internal_page->ValueAt(index);
-    buffer_pool_manager_->UnpinPage(page_id, false);
+    buffer_pool_manager_->UnpinPage(internal_page->GetPageId(), false);
     tree_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(page_id)->GetData());
   }
   auto *leaf = reinterpret_cast<LeafPage *>(tree_page);

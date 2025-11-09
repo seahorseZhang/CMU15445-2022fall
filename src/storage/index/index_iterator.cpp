@@ -24,7 +24,6 @@ auto INDEXITERATOR_TYPE::IsEnd() -> bool {
 }
 
 INDEX_TEMPLATE_ARGUMENTS auto INDEXITERATOR_TYPE::operator*() -> const MappingType & {
-  std::cout << "Get iterator value." << std::endl;
   assert(leaf_ != nullptr);
   assert(index_ < leaf_->GetSize());
   return  leaf_->GetItem(index_);

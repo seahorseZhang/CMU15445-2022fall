@@ -105,6 +105,7 @@ auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> 
     return false;
   }
   if (pages_[frame_id].GetPinCount() == 0) {
+    BUSTUB_ASSERT(false, "page count zero when unpin");
     return false;
   }
   pages_[frame_id].pin_count_ -= 1;
