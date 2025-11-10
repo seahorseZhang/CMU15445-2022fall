@@ -53,6 +53,7 @@ bool BPlusTreeLockBenchmarkCall(size_t num_threads, int leaf_node_size, bool wit
           mtx.lock();
         }
         tree.Insert(index_key, rid, transaction);
+        std::atomic_thread_fence(std::memory_order_seq_cst);
         if (with_global_mutex) {
           mtx.unlock();
         }
