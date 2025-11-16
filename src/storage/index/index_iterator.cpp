@@ -18,20 +18,22 @@ INDEXITERATOR_TYPE::IndexIterator(BufferPoolManager *bpm, Page *page, int index)
     }
 
 INDEX_TEMPLATE_ARGUMENTS
-INDEXITERATOR_TYPE::~IndexIterator() { 
-  bpm_->UnpinPage(leaf_->GetPageId(), false);
+INDEXITERATOR_TYPE::~IndexIterator() {
+  if (page_ != nullptr) {
+    bpm_->UnpinPage(page_->GetPageId(), false);
+  }
 }  // NOLINT
 
 INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::IsEnd() -> bool {
-  return (leaf_->GetNextPageId() == INVALID_PAGE_ID) && (index_ == (leaf_->GetSize() - 1));
+  return (leaf_->GetNextPageId() == INVALID_PAGE_ID) && (index_ >= leaf_->GetSize());
 }
 
-INDEX_TEMPLATE_ARGUMENTS auto INDEXITERATOR_TYPE::operator*() -> const MappingType & {
+INDEX_TEMPLATE_ARGUMENTS auto INDEXITERATOR_TYPE::operator*() -> const MappingType {
   assert(leaf_ != nullptr);
   page_->RLatch();
   assert(index_ < leaf_->GetSize());
-  const MappingType &result = leaf_->GetItem(index_);
+  const MappingType result = leaf_->GetItem(index_);
   page_->RUnlatch();
   return result;
 }
@@ -54,6 +56,26 @@ auto INDEXITERATOR_TYPE::operator++() -> INDEXITERATOR_TYPE & {
   } else {
       ++index_;
       page_->RUnlatch();
+  }
+  return *this;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+INDEXITERATOR_TYPE::IndexIterator(INDEXITERATOR_TYPE &&other)
+    : bpm_(other.bpm_), page_(other.page_), leaf_(other.leaf_), index_(other.index_) {
+  other.page_ = nullptr;
+  other.leaf_ = nullptr;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+INDEXITERATOR_TYPE& INDEXITERATOR_TYPE::operator=(INDEXITERATOR_TYPE &&other)  {
+  if (this != &other) {
+    bpm_ = other.bpm_;
+    page_ = other.page_;
+    leaf_ = other.leaf_;
+    index_ = other.index_;
+    other.page_ = nullptr;
+    other.leaf_ = nullptr;
   }
   return *this;
 }

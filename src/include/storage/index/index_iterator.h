@@ -28,9 +28,17 @@ class IndexIterator {
   IndexIterator(BufferPoolManager *bpm, Page *page, int index = 0);
   ~IndexIterator();  // NOLINT
 
+  IndexIterator(INDEXITERATOR_TYPE &&other);
+
+  auto operator=(INDEXITERATOR_TYPE &&other)-> INDEXITERATOR_TYPE&;
+
+  IndexIterator(const INDEXITERATOR_TYPE &) = delete;
+
+  auto operator=(const INDEXITERATOR_TYPE &)->INDEXITERATOR_TYPE& = delete;
+
   auto IsEnd() -> bool;
 
-  auto operator*() -> const MappingType &;
+  auto operator*() -> const MappingType;
 
   auto operator++() -> IndexIterator &;
 

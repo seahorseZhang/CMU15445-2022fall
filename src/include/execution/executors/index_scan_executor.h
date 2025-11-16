@@ -25,7 +25,6 @@ namespace bustub {
 /**
  * IndexScanExecutor executes an index scan over a table.
  */
-
 class IndexScanExecutor : public AbstractExecutor {
  public:
   /**
@@ -44,5 +43,9 @@ class IndexScanExecutor : public AbstractExecutor {
  private:
   /** The index scan plan node to be executed. */
   const IndexScanPlanNode *plan_;
+  TableInfo *table_info_;
+  IndexInfo *index_info_;
+  BPlusTreeIndexForOneIntegerColumn *tree_;
+  BPlusTreeIndexIteratorForOneIntegerColumn index_iter_;
 };
 }  // namespace bustub
