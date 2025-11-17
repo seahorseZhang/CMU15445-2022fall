@@ -73,12 +73,63 @@ class SimpleAggregationHashTable {
   void CombineAggregateValues(AggregateValue *result, const AggregateValue &input) {
     for (uint32_t i = 0; i < agg_exprs_.size(); i++) {
       switch (agg_types_[i]) {
-        case AggregationType::CountStarAggregate:
-        case AggregationType::CountAggregate:
-        case AggregationType::SumAggregate:
-        case AggregationType::MinAggregate:
-        case AggregationType::MaxAggregate:
-          break;
+          case AggregationType::CountStarAggregate: {
+              Value &value = result->aggregates_[i];
+              int32_t cur_count = value.GetAs<int32_t>();
+              ++cur_count;
+              result->aggregates_[i] = Value(TypeId::INTEGER, cur_count);
+              break; 
+          }
+          case AggregationType::CountAggregate: {
+             const Value &cur_row = input.aggregates_[i];
+              if (!cur_row.IsNull()) {
+                  int32_t cur_count = result->aggregates_[i].GetAs<int32_t>();
+                  if (cur_count == BUSTUB_INT32_NULL) {
+                    cur_count = 0;
+                  }
+                  ++cur_count;
+                 result->aggregates_[i] = Value(TypeId::INTEGER, cur_count);
+             }
+             break;
+        }
+        case AggregationType::SumAggregate: {
+            int32_t cur_sum = result->aggregates_[i].GetAs<int32_t>();
+            int32_t row_value = input.aggregates_[i].GetAs<int32_t>();
+            if (cur_sum == BUSTUB_INT32_NULL) {
+                cur_sum = 0;
+              }
+            if (row_value != BUSTUB_INT32_NULL) {
+                cur_sum += row_value;
+            }
+            result->aggregates_[i] = Value(TypeId::INTEGER, cur_sum);
+            break;
+        }
+        case AggregationType::MinAggregate: {
+            int32_t cur_min = result->aggregates_[i].GetAs<int32_t>();
+            int32_t row_value = input.aggregates_[i].GetAs<int32_t>();
+            if (cur_min == BUSTUB_INT32_NULL) {
+                cur_min = row_value;
+            } else {
+                if (row_value != BUSTUB_INT32_NULL) {
+                    cur_min = std::min(cur_min, row_value);
+                }
+            }
+            result->aggregates_[i] = Value(TypeId::INTEGER, cur_min);
+            break;
+        }
+        case AggregationType::MaxAggregate: {
+            int32_t cur_max = result->aggregates_[i].GetAs<int32_t>();
+            int32_t row_value = input.aggregates_[i].GetAs<int32_t>();
+            if (cur_max == BUSTUB_INT32_NULL) {
+                cur_max = row_value;
+            } else {
+                if (row_value != BUSTUB_INT32_NULL) {
+                    cur_max = std::max(cur_max, row_value);
+                }
+            }
+            result->aggregates_[i] = Value(TypeId::INTEGER, cur_max);
+            break;
+        }
       }
     }
   }
@@ -201,8 +252,8 @@ class AggregationExecutor : public AbstractExecutor {
   /** The child executor that produces tuples over which the aggregation is computed */
   std::unique_ptr<AbstractExecutor> child_;
   /** Simple aggregation hash table */
-  // TODO(Student): Uncomment SimpleAggregationHashTable aht_;
+  SimpleAggregationHashTable aht_;
   /** Simple aggregation hash table iterator */
-  // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator aht_iterator_;
+  SimpleAggregationHashTable::Iterator aht_iterator_;
 };
 }  // namespace bustub
