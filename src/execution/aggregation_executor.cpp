@@ -29,6 +29,14 @@ void AggregationExecutor::Init() {
         AggregateValue value = MakeAggregateValue(&tuple);
         aht_.InsertCombine(key, value);
     }
+    if (aht_.Begin() == aht_.End() && plan_->GetGroupBys().empty()) {
+        AggregateKey empty_key {};
+        for (const AbstractExpressionRef &group: plan_->group_bys_) {
+            empty_key.group_bys_.push_back(ValueFactory::GetNullValueByType(group->GetReturnType()));
+        }
+        AggregateValue value = aht_.GenerateInitialAggregateValue();
+        aht_.InsertInitial(empty_key, value);
+    }
     aht_iterator_ = aht_.Begin();
 }
 

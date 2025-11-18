@@ -63,6 +63,10 @@ class SimpleAggregationHashTable {
     return {values};
   }
 
+  auto InsertInitial(AggregateKey &key, AggregateValue &value)->void {
+    ht_.insert({key, value});
+  }
+
   /**
    * TODO(Student)
    *
@@ -78,13 +82,13 @@ class SimpleAggregationHashTable {
               int32_t cur_count = value.GetAs<int32_t>();
               ++cur_count;
               result->aggregates_[i] = Value(TypeId::INTEGER, cur_count);
-              break; 
+              break;
           }
           case AggregationType::CountAggregate: {
              const Value &cur_row = input.aggregates_[i];
               if (!cur_row.IsNull()) {
                   int32_t cur_count = result->aggregates_[i].GetAs<int32_t>();
-                  if (cur_count == BUSTUB_INT32_NULL) {
+                  if (result->aggregates_[i].IsNull()) {
                     cur_count = 0;
                   }
                   ++cur_count;
@@ -95,10 +99,10 @@ class SimpleAggregationHashTable {
         case AggregationType::SumAggregate: {
             int32_t cur_sum = result->aggregates_[i].GetAs<int32_t>();
             int32_t row_value = input.aggregates_[i].GetAs<int32_t>();
-            if (cur_sum == BUSTUB_INT32_NULL) {
+            if (result->aggregates_[i].IsNull()) {
                 cur_sum = 0;
               }
-            if (row_value != BUSTUB_INT32_NULL) {
+            if (!input.aggregates_[i].IsNull()) {
                 cur_sum += row_value;
             }
             result->aggregates_[i] = Value(TypeId::INTEGER, cur_sum);
@@ -107,10 +111,10 @@ class SimpleAggregationHashTable {
         case AggregationType::MinAggregate: {
             int32_t cur_min = result->aggregates_[i].GetAs<int32_t>();
             int32_t row_value = input.aggregates_[i].GetAs<int32_t>();
-            if (cur_min == BUSTUB_INT32_NULL) {
+            if (result->aggregates_[i].IsNull()) {
                 cur_min = row_value;
             } else {
-                if (row_value != BUSTUB_INT32_NULL) {
+                if (!input.aggregates_[i].IsNull()) {
                     cur_min = std::min(cur_min, row_value);
                 }
             }
@@ -120,10 +124,10 @@ class SimpleAggregationHashTable {
         case AggregationType::MaxAggregate: {
             int32_t cur_max = result->aggregates_[i].GetAs<int32_t>();
             int32_t row_value = input.aggregates_[i].GetAs<int32_t>();
-            if (cur_max == BUSTUB_INT32_NULL) {
+            if (result->aggregates_[i].IsNull()) {
                 cur_max = row_value;
             } else {
-                if (row_value != BUSTUB_INT32_NULL) {
+                if (!input.aggregates_[i].IsNull()) {
                     cur_max = std::max(cur_max, row_value);
                 }
             }
