@@ -59,6 +59,7 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
   std::unique_ptr<AbstractExecutor> right_executor_;
   size_t iterator_;
   std::vector<Tuple> cache_tuples_;
+  std::vector<Tuple> right_tuples_;
 
   auto MergeTuple(Tuple &left, const Schema *left_schema,  Tuple &right, const Schema *right_schema) -> Tuple;
 };

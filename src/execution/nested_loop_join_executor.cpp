@@ -42,16 +42,22 @@ Tuple NestedLoopJoinExecutor::MergeTuple(Tuple &left, const Schema *left_schema,
 
 void NestedLoopJoinExecutor::Init() {
   left_executor_->Init();
+  right_executor_->Init();
   cache_tuples_.clear();
+  right_tuples_.clear();
+
+  Tuple right_tup;
+  RID right_r;
+  while (right_executor_->Next(&right_tup, &right_r)) {
+      right_tuples_.push_back(right_tup);
+  }
   Tuple tuple;
   RID rid;
   const AbstractExpression &predict = plan_->Predicate();
   while (left_executor_->Next(&tuple, &rid)) {
-    Tuple right_tuple;
-    RID right_rid;
     right_executor_->Init();
     bool has_match = false;
-    while (right_executor_->Next(&right_tuple, &right_rid)) {
+    for (Tuple &right_tuple: right_tuples_) {
       Value result = predict.EvaluateJoin(&tuple, left_executor_->GetOutputSchema(), &right_tuple, right_executor_->GetOutputSchema());
       if (!result.IsNull() && result.GetAs<bool>()) {
          cache_tuples_.push_back(MergeTuple(tuple, &left_executor_->GetOutputSchema(), right_tuple, &right_executor_->GetOutputSchema()));
