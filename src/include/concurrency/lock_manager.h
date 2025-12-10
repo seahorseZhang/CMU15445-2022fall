@@ -317,7 +317,7 @@ class LockManager {
 
   auto CheckUpgradeCompatible(LockMode request_lock_mode, LockMode current_lock_mode) -> bool;
 
-  auto GrantLock(std::shared_ptr<LockRequestQueue> request_queue, IsolationLevel isolation_level, LockMode lock_mode) -> bool;
+  auto GrantLock(std::shared_ptr<LockRequestQueue> request_queue, Transaction *txn, LockMode lock_mode) -> bool;
 };
 
 }  // namespace bustub

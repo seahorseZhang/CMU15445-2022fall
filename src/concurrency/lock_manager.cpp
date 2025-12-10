@@ -34,10 +34,10 @@ auto LockManager::CheckUpgradeCompatible(LockMode request_lock_mode, LockMode cu
   return false;
 }
 
-auto LockManager::GrantLock(std::shared_ptr<LockRequestQueue> request_queue, IsolationLevel isolation_level,
+auto LockManager::GrantLock(std::shared_ptr<LockRequestQueue> request_queue, Transaction *txn,
                             LockMode lock_mode) -> bool {
   for (LockRequest *request : request_queue->request_queue_) {
-    if (request->granted_) {
+    if (request->granted_ || request->txn_id_ == txn->GetTransactionId()) {
       continue;
     }
     LockMode request_mode = request->lock_mode_;
@@ -121,7 +121,7 @@ auto LockManager::LockTable(Transaction *txn, LockMode lock_mode, const table_oi
       break;
     }
   }
-  request_queue->latch_.unlock();  
+  request_queue->latch_.unlock();
   // upgrade lock
   if (lock_request != nullptr) {
     if (!lock_request->granted_) {
@@ -173,7 +173,7 @@ auto LockManager::LockTable(Transaction *txn, LockMode lock_mode, const table_oi
   }
   std::unique_lock<std::mutex> queue_lock(request_queue->latch_);
   request_queue->request_queue_.push_back(lock_request);
-  while (!GrantLock(request_queue, txn->GetIsolationLevel(), lock_mode)) {
+  while (!GrantLock(request_queue, txn, lock_mode)) {
     request_queue->cv_.wait(queue_lock);
     if (txn->GetState() == TransactionState::ABORTED) {
       delete lock_request;
@@ -187,28 +187,74 @@ auto LockManager::LockTable(Transaction *txn, LockMode lock_mode, const table_oi
   request_queue->upgrading_ = INVALID_TXN_ID;
   lock_request->granted_ = true;
   switch (lock_request->lock_mode_) {
-      case LockMode::SHARED:
-        txn->GetSharedTableLockSet()->emplace(oid);
-        break;
-      case LockMode::EXCLUSIVE:
-        txn->GetExclusiveTableLockSet()->emplace(oid);
-        break;
-      case LockMode::INTENTION_SHARED:
-        txn->GetIntentionSharedTableLockSet()->emplace(oid);
-        break;
-      case LockMode::INTENTION_EXCLUSIVE:
-        txn->GetIntentionExclusiveTableLockSet()->emplace(oid);
-        break;
-      case LockMode::SHARED_INTENTION_EXCLUSIVE:
-        txn->GetSharedIntentionExclusiveTableLockSet()->emplace(oid);
-        break;
-      default:
-        LOG_ERROR("Unsupported lock mode in granted table lock");
-    }
+    case LockMode::SHARED:
+      txn->GetSharedTableLockSet()->emplace(oid);
+      break;
+    case LockMode::EXCLUSIVE:
+      txn->GetExclusiveTableLockSet()->emplace(oid);
+      break;
+    case LockMode::INTENTION_SHARED:
+      txn->GetIntentionSharedTableLockSet()->emplace(oid);
+      break;
+    case LockMode::INTENTION_EXCLUSIVE:
+      txn->GetIntentionExclusiveTableLockSet()->emplace(oid);
+      break;
+    case LockMode::SHARED_INTENTION_EXCLUSIVE:
+      txn->GetSharedIntentionExclusiveTableLockSet()->emplace(oid);
+      break;
+    default:
+      LOG_ERROR("Unsupported lock mode in granted table lock");
+  }
   return true;
 }
 
-auto LockManager::UnlockTable(Transaction *txn, const table_oid_t &oid) -> bool { return true; }
+auto LockManager::UnlockTable(Transaction *txn, const table_oid_t &oid) -> bool {
+  if (!(txn->IsTableExclusiveLocked(oid) || txn->IsTableSharedLocked(oid) ||
+        txn->IsTableIntentionExclusiveLocked(oid) || txn->IsTableIntentionSharedLocked(oid) ||
+        txn->IsTableSharedIntentionExclusiveLocked(oid))) {
+    txn->SetState(TransactionState::ABORTED);
+    throw new TransactionAbortException(txn->GetTransactionId(), AbortReason::ATTEMPTED_UNLOCK_BUT_NO_LOCK_HELD);
+  }
+
+  if (txn->GetSharedRowLockSet()->count(oid) > 0 || txn->GetExclusiveRowLockSet()->count(oid) > 0) {
+    txn->SetState(TransactionState::ABORTED);
+    throw new TransactionAbortException(txn->GetTransactionId(), AbortReason::TABLE_UNLOCKED_BEFORE_UNLOCKING_ROWS);
+  }
+
+  table_lock_map_latch_.lock();
+  std::shared_ptr<LockRequestQueue> requet_queue = table_lock_map_[oid];
+  requet_queue->latch_.lock();
+  table_lock_map_latch_.unlock();
+  LockMode lock_mode;
+  for (LockRequest *request : requet_queue->request_queue_) {
+    if (request->txn_id_ == txn->GetTransactionId()) {
+      lock_mode = request->lock_mode_;
+      requet_queue->request_queue_.remove(request);
+      break;
+    }
+  }
+  requet_queue->latch_.unlock();
+  requet_queue->cv_.notify_all();
+
+  switch (txn->GetIsolationLevel()) {
+    case IsolationLevel::REPEATABLE_READ:
+      txn->SetState(TransactionState::SHRINKING);
+      break;
+    case IsolationLevel::READ_COMMITTED:
+      if (lock_mode == LockMode::EXCLUSIVE || lock_mode == LockMode::INTENTION_EXCLUSIVE ||
+          lock_mode == LockMode::SHARED_INTENTION_EXCLUSIVE) {
+        txn->SetState(TransactionState::SHRINKING);
+      }
+      break;
+    case IsolationLevel::READ_UNCOMMITTED:
+      txn->SetState(TransactionState::SHRINKING);
+      break;
+    default:
+      LOG_ERROR("invalid isolation level when unlock table");
+      break;
+  }
+  return true;
+}
 
 auto LockManager::LockRow(Transaction *txn, LockMode lock_mode, const table_oid_t &oid, const RID &rid) -> bool {
   return true;
