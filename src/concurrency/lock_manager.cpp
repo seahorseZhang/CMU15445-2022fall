@@ -236,6 +236,26 @@ auto LockManager::UnlockTable(Transaction *txn, const table_oid_t &oid) -> bool 
   requet_queue->latch_.unlock();
   requet_queue->cv_.notify_all();
 
+  switch (lock_mode) {
+    case LockMode::SHARED:
+      txn->GetSharedTableLockSet()->erase(oid);
+      break;
+    case LockMode::EXCLUSIVE:
+      txn->GetExclusiveTableLockSet()->erase(oid);
+      break;
+    case LockMode::INTENTION_SHARED:
+      txn->GetIntentionSharedTableLockSet()->erase(oid);
+      break;
+    case LockMode::INTENTION_EXCLUSIVE:
+      txn->GetIntentionExclusiveTableLockSet()->erase(oid);
+      break;
+    case LockMode::SHARED_INTENTION_EXCLUSIVE:
+      txn->GetSharedIntentionExclusiveTableLockSet()->erase(oid);
+      break;
+    default:
+      LOG_ERROR("Unsupported lock mode in unlock table");
+  }
+
   switch (txn->GetIsolationLevel()) {
     case IsolationLevel::REPEATABLE_READ:
       txn->SetState(TransactionState::SHRINKING);
