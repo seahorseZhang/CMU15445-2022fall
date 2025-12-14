@@ -21,7 +21,7 @@
       << "Test Failed Due to Time Out";
 
 namespace bustub {
-TEST(LockManagerDeadlockDetectionTest, DISABLED_EdgeTest) {
+TEST(LockManagerDeadlockDetectionTest, EdgeTest) {
   LockManager lock_mgr{};
 
   const int num_nodes = 100;
@@ -61,6 +61,24 @@ TEST(LockManagerDeadlockDetectionTest, DISABLED_EdgeTest) {
   for (int i = 0; i < num_edges; i++) {
     EXPECT_EQ(edges[i], lock_mgr_edges[i]);
   }
+}
+
+TEST(LockManagerDeadlockDetectionTest, HasCycleTest) {
+  LockManager lock_mgr{};
+
+  lock_mgr.AddEdge(1, 2);
+  lock_mgr.AddEdge(2, 3);
+  lock_mgr.AddEdge(3, 4);
+  lock_mgr.AddEdge(4, 5);
+  lock_mgr.AddEdge(5, 6);
+  lock_mgr.AddEdge(6, 1);
+  
+  txn_id_t txn_id = 0;
+  EXPECT_EQ(true, lock_mgr.HasCycle(&txn_id));
+  EXPECT_EQ(6, txn_id);
+
+  lock_mgr.RemoveEdge(2, 3);
+  EXPECT_FALSE(lock_mgr.HasCycle(&txn_id));
 }
 
 TEST(LockManagerDeadlockDetectionTest, DISABLED_BasicDeadlockDetectionTest) {

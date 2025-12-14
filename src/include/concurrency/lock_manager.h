@@ -315,13 +315,18 @@ class LockManager {
   std::unordered_map<txn_id_t, std::vector<txn_id_t>> waits_for_;
   std::mutex waits_for_latch_;
 
+  std::unordered_set<txn_id_t> txn_set_;
+  std::unordered_set<txn_id_t> txn_path_;
+
   auto CheckUpgradeCompatible(LockMode request_lock_mode, LockMode current_lock_mode) -> bool;
 
   auto GrantLock(std::shared_ptr<LockRequestQueue> request_queue, Transaction *txn, LockMode lock_mode) -> bool;
 
-  auto GrantRowLock(std::shared_ptr<LockRequestQueue> request_queue, Transaction* txn) -> bool;
+  auto GrantRowLock(std::shared_ptr<LockRequestQueue> request_queue, Transaction *txn) -> bool;
 
   auto ChangeTxnState(Transaction *txn, LockMode lock_mode) -> void;
+
+  auto DfsCycle(txn_id_t txn_id) -> bool;
 };
 
 }  // namespace bustub

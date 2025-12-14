@@ -457,14 +457,61 @@ auto LockManager::UnlockRow(Transaction *txn, const table_oid_t &oid, const RID 
   return true;
 }
 
-void LockManager::AddEdge(txn_id_t t1, txn_id_t t2) {}
+void LockManager::AddEdge(txn_id_t t1, txn_id_t t2) {
+  txn_set_.emplace(t1);
+  txn_set_.emplace(t2);
+  waits_for_[t1].push_back(t2);
+}
 
-void LockManager::RemoveEdge(txn_id_t t1, txn_id_t t2) {}
+void LockManager::RemoveEdge(txn_id_t t1, txn_id_t t2) {
+  std::vector<txn_id_t> &t1_wait_list = waits_for_[t1];
+  std::vector<txn_id_t>::iterator iter = std::find(t1_wait_list.begin(), t1_wait_list.end(), t2);
+  if (iter != t1_wait_list.end()) {
+    t1_wait_list.erase(iter);
+  }
+}
 
-auto LockManager::HasCycle(txn_id_t *txn_id) -> bool { return false; }
+auto LockManager::DfsCycle(txn_id_t txn_id) -> bool {
+  if (txn_path_.count(txn_id)) {
+    return true;
+  }
+  txn_path_.emplace(txn_id);
+  std::vector<txn_id_t> &wait_list = waits_for_[txn_id];
+  for (auto iter = wait_list.begin(); iter != wait_list.end(); ++iter) {
+    if (txn_path_.count(*iter)) {
+      return true;
+    }
+    if (DfsCycle(*iter)) {
+      return true;
+    }
+  }
+  txn_path_.erase(txn_id);
+  return false;
+}
+
+auto LockManager::HasCycle(txn_id_t *txn_id) -> bool {
+  txn_id_t max_txn_id = 0;
+  for (const txn_id_t &id : txn_set_) {
+    if (DfsCycle(id)) {
+      for (const txn_id_t &node_id : txn_path_) {
+        max_txn_id = std::max(max_txn_id, node_id);
+      }
+      *txn_id = max_txn_id;
+      txn_path_.clear();
+      return true;
+    }
+  }
+  return false;
+}
 
 auto LockManager::GetEdgeList() -> std::vector<std::pair<txn_id_t, txn_id_t>> {
   std::vector<std::pair<txn_id_t, txn_id_t>> edges(0);
+  for (auto iter = txn_set_.begin(); iter != txn_set_.end(); ++iter) {
+    std::vector<txn_id_t> &wait_list = waits_for_[*iter];
+    for (txn_id_t txn_id : wait_list) {
+      edges.emplace_back(*iter, txn_id);
+    }
+  }
   return edges;
 }
 
