@@ -81,7 +81,7 @@ TEST(LockManagerDeadlockDetectionTest, HasCycleTest) {
   EXPECT_FALSE(lock_mgr.HasCycle(&txn_id));
 }
 
-TEST(LockManagerDeadlockDetectionTest, DISABLED_BasicDeadlockDetectionTest) {
+TEST(LockManagerDeadlockDetectionTest, BasicDeadlockDetectionTest) {
   LockManager lock_mgr{};
   TransactionManager txn_mgr{&lock_mgr};
 

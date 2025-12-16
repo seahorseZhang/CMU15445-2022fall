@@ -519,6 +519,63 @@ void LockManager::RunCycleDetection() {
   while (enable_cycle_detection_) {
     std::this_thread::sleep_for(cycle_detection_interval);
     {  // TODO(students): detect deadlock
+      table_lock_map_latch_.lock();
+      row_lock_map_latch_.lock();
+      for (auto iter = table_lock_map_.begin(); iter != table_lock_map_.end(); ++iter) {
+        std::shared_ptr<LockRequestQueue> request_queue = iter->second;
+        request_queue->latch_.lock();
+        std::unordered_set<txn_id_t> granted_set;
+        std::unordered_set<txn_id_t> wait_set;
+        for (LockRequest *request : request_queue->request_queue_) {
+          if (request->granted_) {
+            granted_set.emplace(request->txn_id_);
+          } else {
+            wait_set.emplace(request->txn_id_);
+          }
+        }
+        for (txn_id_t wait_txn : wait_set) {
+          for (txn_id_t grant_txn : granted_set) {
+            AddEdge(wait_txn, grant_txn);
+          }
+        }
+        request_queue->latch_.unlock();
+      }
+    }
+
+    for (auto iter = row_lock_map_.begin(); iter != row_lock_map_.end(); ++iter) {
+      std::shared_ptr<LockRequestQueue> request_queue = iter->second;
+      request_queue->latch_.lock();
+      std::unordered_set<txn_id_t> granted_set;
+      std::unordered_set<txn_id_t> wait_set;
+      for (LockRequest *request : request_queue->request_queue_) {
+        if (request->granted_) {
+          granted_set.emplace(request->txn_id_);
+        } else {
+          wait_set.emplace(request->txn_id_);
+        }
+      }
+      for (txn_id_t wait_txn : wait_set) {
+        for (txn_id_t grant_txn : granted_set) {
+          AddEdge(wait_txn, grant_txn);
+        }
+      }
+      request_queue->latch_.unlock();
+    }
+  }
+
+  row_lock_map_latch_.unlock();
+  table_lock_map_latch_.unlock();
+
+  txn_id_t cycle_txn;
+  while (HasCycle(&cycle_txn)) {
+    Transaction *txn = TransactionManager::GetTransaction(cycle_txn);
+    if (txn != nullptr) {
+      txn->SetState(TransactionState::ABORTED);
+    }
+
+    std::vector<txn_id_t> wait_vec = waits_for_[cycle_txn];
+    for (txn_id_t wait_txn : wait_vec) {
+      RemoveEdge(cycle_txn, wait_txn);
     }
   }
 }
