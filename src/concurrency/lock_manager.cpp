@@ -349,9 +349,9 @@ auto LockManager::LockRow(Transaction *txn, LockMode lock_mode, const table_oid_
   request_queue->latch_.lock();
   row_lock_map_latch_.unlock();
   LockRequest *request = nullptr;
-  for (LockRequest *request : request_queue->request_queue_) {
-    if (request->txn_id_ == txn->GetTransactionId()) {
-      request = request;
+  for (LockRequest *req : request_queue->request_queue_) {
+    if (req->txn_id_ == txn->GetTransactionId()) {
+      request = req;
       break;
     }
   }
@@ -437,6 +437,7 @@ auto LockManager::UnlockRow(Transaction *txn, const table_oid_t &oid, const RID 
   LockMode lock_mode = target_request->lock_mode_;
   request_queue->request_queue_.remove(target_request);
   row_lock_map_latch_.unlock();
+  request_queue->cv_.notify_all();
 
   if (lock_mode == LockMode::SHARED) {
     auto shared_set = txn->GetSharedRowLockSet();
@@ -519,6 +520,7 @@ void LockManager::RunCycleDetection() {
   while (enable_cycle_detection_) {
     std::this_thread::sleep_for(cycle_detection_interval);
     {  // TODO(students): detect deadlock
+      std::cout << "start cycle detection" << std::endl;
       table_lock_map_latch_.lock();
       row_lock_map_latch_.lock();
       for (auto iter = table_lock_map_.begin(); iter != table_lock_map_.end(); ++iter) {
@@ -535,7 +537,7 @@ void LockManager::RunCycleDetection() {
         }
         for (txn_id_t wait_txn : wait_set) {
           for (txn_id_t grant_txn : granted_set) {
-            AddEdge(wait_txn, grant_txn);
+            AddEdge(grant_txn, wait_txn);
           }
         }
         request_queue->latch_.unlock();
@@ -556,28 +558,53 @@ void LockManager::RunCycleDetection() {
       }
       for (txn_id_t wait_txn : wait_set) {
         for (txn_id_t grant_txn : granted_set) {
-          AddEdge(wait_txn, grant_txn);
+          AddEdge(grant_txn, wait_txn);
         }
       }
       request_queue->latch_.unlock();
     }
-  }
 
-  row_lock_map_latch_.unlock();
+    row_lock_map_latch_.unlock();
+    table_lock_map_latch_.unlock();
+
+    txn_id_t cycle_txn;
+    while (HasCycle(&cycle_txn)) {
+      Transaction *txn = TransactionManager::GetTransaction(cycle_txn);
+      if (txn != nullptr) {
+        txn->SetState(TransactionState::ABORTED);
+      }
+      NotifyWaitingThreads(cycle_txn);
+
+      std::vector<txn_id_t> wait_vec = waits_for_[cycle_txn];
+      for (txn_id_t wait_txn : wait_vec) {
+        RemoveEdge(cycle_txn, wait_txn);
+      }
+      txn_path_.clear();
+    }
+
+    waits_for_.clear();
+    txn_set_.clear();
+  }
+}
+
+void LockManager::NotifyWaitingThreads(txn_id_t txn_id) {
+  // 遍历所有表锁队列，唤醒等待该事务的线程
+  table_lock_map_latch_.lock();
+  for (const auto &[oid, req_queue] : table_lock_map_) {
+    req_queue->latch_.lock();
+    req_queue->cv_.notify_all();
+    req_queue->latch_.unlock();
+  }
   table_lock_map_latch_.unlock();
 
-  txn_id_t cycle_txn;
-  while (HasCycle(&cycle_txn)) {
-    Transaction *txn = TransactionManager::GetTransaction(cycle_txn);
-    if (txn != nullptr) {
-      txn->SetState(TransactionState::ABORTED);
-    }
-
-    std::vector<txn_id_t> wait_vec = waits_for_[cycle_txn];
-    for (txn_id_t wait_txn : wait_vec) {
-      RemoveEdge(cycle_txn, wait_txn);
-    }
+  // 遍历所有行锁队列，唤醒等待该事务的线程
+  row_lock_map_latch_.lock();
+  for (const auto &[rid, req_queue] : row_lock_map_) {
+    req_queue->latch_.lock();
+    req_queue->cv_.notify_all();
+    req_queue->latch_.unlock();
   }
+  row_lock_map_latch_.unlock();
 }
 
 }  // namespace bustub

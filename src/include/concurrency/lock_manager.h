@@ -327,6 +327,8 @@ class LockManager {
   auto ChangeTxnState(Transaction *txn, LockMode lock_mode) -> void;
 
   auto DfsCycle(txn_id_t txn_id) -> bool;
+
+  auto NotifyWaitingThreads(txn_id_t txn_id) -> void;
 };
 
 }  // namespace bustub
