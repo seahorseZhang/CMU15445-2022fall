@@ -250,15 +250,21 @@ auto LockManager::UnlockTable(Transaction *txn, const table_oid_t &oid) -> bool 
   requet_queue->latch_.lock();
   table_lock_map_latch_.unlock();
   LockMode lock_mode;
+  LockRequest *target_request = nullptr;
   for (LockRequest *request : requet_queue->request_queue_) {
     if (request->txn_id_ == txn->GetTransactionId()) {
       lock_mode = request->lock_mode_;
+      target_request = request;
       requet_queue->request_queue_.remove(request);
       break;
     }
   }
   requet_queue->latch_.unlock();
   requet_queue->cv_.notify_all();
+  if (target_request != nullptr) {
+    delete target_request;
+    target_request = nullptr;
+  }
 
   switch (lock_mode) {
     case LockMode::SHARED:
@@ -438,6 +444,10 @@ auto LockManager::UnlockRow(Transaction *txn, const table_oid_t &oid, const RID 
   request_queue->request_queue_.remove(target_request);
   row_lock_map_latch_.unlock();
   request_queue->cv_.notify_all();
+  if (target_request != nullptr) {
+    delete target_request;
+    target_request = nullptr;
+  }
 
   if (lock_mode == LockMode::SHARED) {
     auto shared_set = txn->GetSharedRowLockSet();
@@ -520,7 +530,6 @@ void LockManager::RunCycleDetection() {
   while (enable_cycle_detection_) {
     std::this_thread::sleep_for(cycle_detection_interval);
     {  // TODO(students): detect deadlock
-      std::cout << "start cycle detection" << std::endl;
       table_lock_map_latch_.lock();
       row_lock_map_latch_.lock();
       for (auto iter = table_lock_map_.begin(); iter != table_lock_map_.end(); ++iter) {
